@@ -1,0 +1,190 @@
+[
+  {
+    "id": 1,
+    "name": "Capt. Marcus 'Viper' Reid",
+    "callSign": "Viper",
+    "rank": "Captain",
+    "registrationNumber": "PLT-2841",
+    "assignedAircraft": "AC-001",
+    "status": "Active",
+    "image": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=300&fit=crop&crop=face",
+    "injury": "None",
+    "medicalReport": "Fit for duty. Last check: 2026-03-01",
+    "missions": [
+      {"name": "Operation Nightfall", "duration": "4h 30m", "status": "Completed", "outcome": "Success", "notes": "Recon over sector 7. No hostiles encountered."},
+      {"name": "Operation Iron Sky", "duration": "6h 15m", "status": "Completed", "outcome": "Success", "notes": "Escort mission. VIP safely delivered."},
+      {"name": "Operation Ghost Trail", "duration": "3h 00m", "status": "In Progress", "outcome": "Pending", "notes": "Long-range surveillance ongoing."}
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Lt. Sarah 'Phoenix' Chen",
+    "callSign": "Phoenix",
+    "rank": "Lieutenant",
+    "registrationNumber": "PLT-2842",
+    "assignedAircraft": "AC-002",
+    "status": "Active",
+    "image": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&h=300&fit=crop&crop=face",
+    "injury": "None",
+    "medicalReport": "Fit for duty. Last check: 2026-02-28",
+    "missions": [
+      {"name": "Operation Thunderbolt", "duration": "5h 00m", "status": "Completed", "outcome": "Success", "notes": "Air superiority mission."},
+      {"name": "Operation Sandstorm", "duration": "7h 45m", "status": "Completed", "outcome": "Partial", "notes": "Weather forced early RTB."}
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Maj. James 'Hawk' Sullivan",
+    "callSign": "Hawk",
+    "rank": "Major",
+    "registrationNumber": "PLT-2843",
+    "assignedAircraft": "AC-003",
+    "status": "Holiday",
+    "image": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop&crop=face",
+    "injury": "None",
+    "medicalReport": "Fit for duty. On approved leave until 2026-04-01",
+    "missions": [
+      {"name": "Operation Blue Horizon", "duration": "8h 00m", "status": "Completed", "outcome": "Success", "notes": "Long-range patrol. All objectives met."}
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Capt. Elena 'Spectre' Vasquez",
+    "callSign": "Spectre",
+    "rank": "Captain",
+    "registrationNumber": "PLT-2844",
+    "assignedAircraft": "AC-004",
+    "status": "Active",
+    "image": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300&h=300&fit=crop&crop=face",
+    "injury": "None",
+    "medicalReport": "Fit for duty. Last check: 2026-03-10",
+    "missions": [
+      {"name": "Operation Silent Watch", "duration": "4h 00m", "status": "Completed", "outcome": "Success", "notes": "Night reconnaissance."},
+      {"name": "Operation Firestorm", "duration": "3h 30m", "status": "Completed", "outcome": "Success", "notes": "CAS mission. All targets neutralized."}
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Lt. David 'Maverick' Kim",
+    "callSign": "Maverick",
+    "rank": "Lieutenant",
+    "registrationNumber": "PLT-2845",
+    "assignedAircraft": "AC-005",
+    "status": "Rest",
+    "image": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&h=300&fit=crop&crop=face",
+    "injury": "Minor shoulder strain",
+    "medicalReport": "Light duty only. Recovery expected by 2026-04-05",
+    "missions": [
+      {"name": "Operation Valkyrie", "duration": "5h 15m", "status": "Completed", "outcome": "Success", "notes": "Formation training exercise."}
+    ]
+  },
+  {
+    "id": 6,
+    "name": "Capt. Omar 'Blaze' Hassan",
+    "callSign": "Blaze",
+    "rank": "Captain",
+    "registrationNumber": "PLT-2846",
+    "assignedAircraft": "AC-006",
+    "status": "Active",
+    "image": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&h=300&fit=crop&crop=face",
+    "injury": "None",
+    "medicalReport": "Fit for duty. Last check: 2026-03-12",
+    "missions": [
+      {"name": "Operation Darkstar", "duration": "6h 30m", "status": "Completed", "outcome": "Success", "notes": "Deep strike mission."},
+      {"name": "Operation Crosswind", "duration": "2h 45m", "status": "Completed", "outcome": "Success", "notes": "Weather ops training."}
+    ]
+  },
+  {
+    "id": 7,
+    "name": "Lt. Yuki 'Frost' Tanaka",
+    "callSign": "Frost",
+    "rank": "Lieutenant",
+    "registrationNumber": "PLT-2847",
+    "assignedAircraft": "AC-007",
+    "status": "Not Active",
+    "image": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop&crop=face",
+    "injury": "Fractured wrist",
+    "medicalReport": "Grounded. Recovery timeline: 6 weeks from 2026-03-01",
+    "missions": [
+      {"name": "Operation Arctic Wolf", "duration": "7h 00m", "status": "Completed", "outcome": "Success", "notes": "High-altitude intercept."}
+    ]
+  },
+  {
+    "id": 8,
+    "name": "Maj. Alexei 'Ghost' Petrov",
+    "callSign": "Ghost",
+    "rank": "Major",
+    "registrationNumber": "PLT-2848",
+    "assignedAircraft": "AC-001",
+    "status": "Active",
+    "image": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&h=300&fit=crop&crop=face",
+    "injury": "None",
+    "medicalReport": "Fit for duty. Last check: 2026-03-15",
+    "missions": [
+      {"name": "Operation Phantom", "duration": "5h 00m", "status": "Completed", "outcome": "Success", "notes": "Stealth recon."},
+      {"name": "Operation Sentinel", "duration": "4h 30m", "status": "In Progress", "outcome": "Pending", "notes": "Border patrol mission."}
+    ]
+  },
+  {
+    "id": 9,
+    "name": "Capt. Aisha 'Tempest' Noor",
+    "callSign": "Tempest",
+    "rank": "Captain",
+    "registrationNumber": "PLT-2849",
+    "assignedAircraft": "AC-003",
+    "status": "Active",
+    "image": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&h=300&fit=crop&crop=face",
+    "injury": "None",
+    "medicalReport": "Fit for duty. Last check: 2026-03-08",
+    "missions": [
+      {"name": "Operation Cyclone", "duration": "3h 15m", "status": "Completed", "outcome": "Success", "notes": "Air defense drill."}
+    ]
+  },
+  {
+    "id": 10,
+    "name": "Lt. Ryan 'Bolt' O'Connor",
+    "callSign": "Bolt",
+    "rank": "Lieutenant",
+    "registrationNumber": "PLT-2850",
+    "assignedAircraft": "AC-005",
+    "status": "Active",
+    "image": "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300&h=300&fit=crop&crop=face",
+    "injury": "None",
+    "medicalReport": "Fit for duty. Last check: 2026-03-18",
+    "missions": [
+      {"name": "Operation Quicksilver", "duration": "2h 30m", "status": "Completed", "outcome": "Success", "notes": "Rapid deployment exercise."},
+      {"name": "Operation Thunder", "duration": "4h 00m", "status": "Completed", "outcome": "Success", "notes": "Live fire exercise."}
+    ]
+  },
+  {
+    "id": 11,
+    "name": "Capt. Lena 'Shadow' Kruger",
+    "callSign": "Shadow",
+    "rank": "Captain",
+    "registrationNumber": "PLT-2851",
+    "assignedAircraft": "AC-006",
+    "status": "Rest",
+    "image": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&h=300&fit=crop&crop=face",
+    "injury": "None",
+    "medicalReport": "On scheduled rest cycle. Returns 2026-03-28",
+    "missions": [
+      {"name": "Operation Nightshade", "duration": "6h 00m", "status": "Completed", "outcome": "Success", "notes": "Night ops. Full stealth protocol."}
+    ]
+  },
+  {
+    "id": 12,
+    "name": "Lt. Carlos 'Raptor' Mendez",
+    "callSign": "Raptor",
+    "rank": "Lieutenant",
+    "registrationNumber": "PLT-2852",
+    "assignedAircraft": "AC-007",
+    "status": "Active",
+    "image": "https://images.unsplash.com/photo-1463453091185-61582044d556?w=300&h=300&fit=crop&crop=face",
+    "injury": "None",
+    "medicalReport": "Fit for duty. Last check: 2026-03-20",
+    "missions": [
+      {"name": "Operation Eagle Eye", "duration": "5h 30m", "status": "Completed", "outcome": "Success", "notes": "Aerial photography mission."},
+      {"name": "Operation Talon", "duration": "3h 45m", "status": "Completed", "outcome": "Partial", "notes": "Aborted due to equipment malfunction."}
+    ]
+  }
+]

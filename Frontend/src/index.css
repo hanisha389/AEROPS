@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 50% 5%;
+    --foreground: 195 100% 65%;
+
+    --card: 210 40% 8%;
+    --card-foreground: 195 100% 65%;
+
+    --popover: 210 40% 8%;
+    --popover-foreground: 195 100% 65%;
+
+    --primary: 195 100% 65%;
+    --primary-foreground: 210 50% 5%;
+
+    --secondary: 210 40% 12%;
+    --secondary-foreground: 195 100% 65%;
+
+    --muted: 210 30% 15%;
+    --muted-foreground: 195 40% 45%;
+
+    --accent: 195 100% 65%;
+    --accent-foreground: 210 50% 5%;
+
+    --destructive: 0 80% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 195 80% 25%;
+    --input: 210 40% 15%;
+    --ring: 195 100% 65%;
+
+    --radius: 0.25rem;
+
+    --neon-blue: 195 100% 65%;
+    --neon-glow: 0 0 10px hsl(195 100% 65% / 0.5), 0 0 20px hsl(195 100% 65% / 0.3), 0 0 40px hsl(195 100% 65% / 0.1);
+
+    --sidebar-background: 210 40% 8%;
+    --sidebar-foreground: 195 100% 65%;
+    --sidebar-primary: 195 100% 65%;
+    --sidebar-primary-foreground: 210 50% 5%;
+    --sidebar-accent: 210 40% 12%;
+    --sidebar-accent-foreground: 195 100% 65%;
+    --sidebar-border: 195 80% 25%;
+    --sidebar-ring: 195 100% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Rajdhani', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Orbitron', sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-orbitron {
+    font-family: 'Orbitron', sans-serif;
+  }
+  .font-rajdhani {
+    font-family: 'Rajdhani', sans-serif;
+  }
+  .neon-glow {
+    text-shadow: var(--neon-glow);
+  }
+  .neon-border {
+    box-shadow: inset 0 0 8px hsl(195 100% 65% / 0.15), 0 0 8px hsl(195 100% 65% / 0.15);
+  }
+  .neon-border-strong {
+    box-shadow: inset 0 0 12px hsl(195 100% 65% / 0.25), 0 0 15px hsl(195 100% 65% / 0.2);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(210 40% 8%);
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(195 100% 65% / 0.3);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(195 100% 65% / 0.5);
+}
