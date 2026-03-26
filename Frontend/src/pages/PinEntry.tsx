@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import BackgroundLayout from '@/components/BackgroundLayout';
+import { api } from '@/lib/api';
 
 const PinEntry = () => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const inputRef = (el: HTMLInputElement | null) => { if (el) el.focus(); };
 
@@ -16,11 +18,25 @@ const PinEntry = () => {
     }
   };
 
-  const handleSubmit = () => {
-    if (pin === '123456') {
-      navigate('/menu');
-    } else {
+  const handleSubmit = async () => {
+    if (pin.length !== 6) {
       setError(true);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await api.verifyPin(pin);
+      if (result.valid) {
+        sessionStorage.setItem('aerops-auth', 'true');
+        navigate('/menu');
+      } else {
+        setError(true);
+      }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -85,9 +101,10 @@ const PinEntry = () => {
 
           <button
             onClick={handleSubmit}
+            disabled={loading}
             className="neon-border border border-primary px-10 py-2.5 font-orbitron text-sm tracking-[0.2em] text-primary transition-all duration-200 hover:bg-primary/10 hover:neon-border-strong"
           >
-            ENTER
+            {loading ? 'VERIFYING...' : 'ENTER'}
           </button>
         </motion.div>
       </div>

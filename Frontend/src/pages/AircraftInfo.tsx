@@ -10,34 +10,11 @@ interface Aircraft {
   name: string;
   model: string;
   assignedPilot: string;
+  assignedPilots: string[];
   missions: string[];
   lastMaintenance: string;
-  health: {
-    engine: string;
-    wings: string;
-    navigation: string;
-    fuelSystem: string;
-    landingGear: string;
-  };
+  healthStatus?: string;
 }
-
-const healthColor = (s: string) => {
-  switch (s) {
-    case 'Good': return 'text-green-400 bg-green-400/10 border-green-400/30';
-    case 'Warning': return 'text-amber-400 bg-amber-400/10 border-amber-400/30';
-    case 'Critical': return 'text-red-400 bg-red-400/10 border-red-400/30';
-    default: return 'text-muted-foreground';
-  }
-};
-
-const healthDot = (s: string) => {
-  switch (s) {
-    case 'Good': return 'bg-green-400';
-    case 'Warning': return 'bg-amber-400';
-    case 'Critical': return 'bg-red-400';
-    default: return 'bg-muted-foreground';
-  }
-};
 
 const AircraftInfo = () => {
   const [aircrafts, setAircrafts] = useState<Aircraft[]>([]);
@@ -84,6 +61,7 @@ const AircraftInfo = () => {
                       <p className="font-rajdhani text-sm text-muted-foreground">Aircraft ID: <span className="text-primary">{ac.id}</span></p>
                       <p className="font-rajdhani text-sm text-muted-foreground">Last Maintenance: <span className="text-primary">{ac.lastMaintenance}</span></p>
                       <p className="font-rajdhani text-sm text-muted-foreground">Missions: <span className="text-primary">{ac.missions.length}</span></p>
+                      <p className="font-rajdhani text-sm text-muted-foreground">Assigned Pilots: <span className="text-primary">{ac.assignedPilots.length}</span></p>
                     </div>
 
                     <div className="mb-3">
@@ -96,18 +74,12 @@ const AircraftInfo = () => {
                     </div>
 
                     <div>
-                      <h4 className="mb-2 font-orbitron text-xs tracking-widest text-muted-foreground">HEALTH STATUS</h4>
-                      <div className="grid grid-cols-5 gap-2">
-                        {Object.entries(ac.health).map(([key, val]) => (
-                          <div key={key} className={`border px-3 py-2 text-center ${healthColor(val)}`}>
-                            <div className="flex items-center justify-center gap-1.5">
-                              <div className={`h-1.5 w-1.5 rounded-full ${healthDot(val)}`} />
-                              <span className="font-rajdhani text-xs font-semibold uppercase">{val}</span>
-                            </div>
-                            <p className="mt-1 font-rajdhani text-[10px] uppercase tracking-wider opacity-70">
-                              {key.replace(/([A-Z])/g, ' $1').trim()}
-                            </p>
-                          </div>
+                      <h4 className="mb-2 font-orbitron text-xs tracking-widest text-muted-foreground">ASSIGNED PILOTS</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {ac.assignedPilots.map((pilotName, j) => (
+                          <span key={j} className="border border-border/30 bg-background/30 px-2 py-0.5 font-rajdhani text-xs text-primary">
+                            {pilotName}
+                          </span>
                         ))}
                       </div>
                     </div>
