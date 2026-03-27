@@ -9,14 +9,66 @@ export interface PilotPayload {
   registrationNumber: string;
   rank: string;
   callSign: string;
-  assignedAircraft?: string;
+  assignedAircraft: string;
   status: string;
   onHoliday: boolean;
   image: string;
+  personalDetails: {
+    fullName: string;
+    serviceNumber: string;
+    dateOfBirth?: string;
+    dateOfJoining?: string;
+    yearsOfService: number;
+  };
+  operationalStatus: {
+    operationalState: string;
+    baseLocation?: string;
+    assignedSquadron?: string;
+    assignedAircraftType?: string;
+    lastMissionDate?: string;
+    currentMissionAssignment?: string;
+  };
+  qualifications: {
+    aircraftCertifications: string[];
+    totalFlightHours: number;
+    flightHoursPerAircraft: Record<string, number>;
+    specializations: string[];
+    trainingLevel: string;
+    simulatorPerformanceScore: number;
+  };
+  performanceMetrics: {
+    avgMissionSuccessRate: number;
+    reactionTimeScore: number;
+    maneuverAccuracy: number;
+    decisionEfficiencyScore: number;
+    last5TrainingResults: string[];
+  };
   medical: {
     injuries: string;
     fitForDuty: boolean;
     lastStatus: string;
+  };
+  medicalDetails: {
+    currentStatus: string;
+    lastMedicalCheckDate?: string;
+    nextDueCheck?: string;
+    heartRate?: string;
+    bloodPressure?: string;
+    oxygenSaturation?: string;
+    visionStatus?: string;
+    gToleranceLevel?: string;
+    pastInjuries: string[];
+    surgeries: string[];
+    chronicConditions: string[];
+    medication: string[];
+    fatigueLevel?: string;
+    stressLevel?: string;
+    sleepQualityScore: number;
+    cognitiveReadiness: number;
+    lastClearedForFlight?: string;
+    clearedBy?: string;
+    clearanceRemarks?: string;
+    safeToAssign: boolean;
   };
   missions: {
     name: string;
@@ -43,6 +95,7 @@ export interface EngineerPayload {
     isCurrent: boolean;
     date: string;
     issueId?: number;
+    completionStatus?: string;
   }[];
 }
 
@@ -89,6 +142,8 @@ export const api = {
   addEngineer: (payload: EngineerPayload) => client.post("/engineers", payload).then((res) => res.data),
   addEngineerLog: (engineerId: number, payload: EngineerPayload["maintenanceLogs"][number]) =>
     client.post(`/engineers/${engineerId}/logs`, payload).then((res) => res.data),
+  updateEngineerLogStatus: (engineerId: number, logId: number, completionStatus: string) =>
+    client.put(`/engineers/${engineerId}/logs/${logId}/status`, { completionStatus }).then((res) => res.data),
   getOpenIssues: (): Promise<OpenIssue[]> => client.get("/engineers/open-issues").then((res) => res.data),
 
   getAircrafts: () => client.get("/aircraft").then((res) => res.data),

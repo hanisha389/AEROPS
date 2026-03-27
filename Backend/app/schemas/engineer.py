@@ -11,7 +11,8 @@ class EngineerMaintenanceLogBase(BaseModel):
 
 
 class EngineerMaintenanceLogRead(EngineerMaintenanceLogBase):
-    pass
+    id: int
+    completionStatus: str = "Pending"
 
 
 class EngineerBase(BaseModel):
@@ -30,6 +31,10 @@ class EngineerCreate(EngineerBase):
 
 class EngineerMaintenanceLogCreate(EngineerMaintenanceLogBase):
     issueId: Optional[int] = None
+
+
+class EngineerMaintenanceStatusUpdate(BaseModel):
+    completionStatus: str
 
 
 class EngineerRead(EngineerBase):

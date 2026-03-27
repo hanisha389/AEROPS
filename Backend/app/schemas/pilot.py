@@ -33,6 +33,75 @@ class PilotTrainingRead(BaseModel):
     createdAt: str
 
 
+class PilotPersonalDetailsBase(BaseModel):
+    fullName: str
+    serviceNumber: str
+    dateOfBirth: Optional[str] = None
+    dateOfJoining: Optional[str] = None
+    yearsOfService: float = 0
+
+
+class PilotOperationalStatusBase(BaseModel):
+    operationalState: str = "Active"
+    baseLocation: Optional[str] = None
+    assignedSquadron: Optional[str] = None
+    assignedAircraftType: Optional[str] = None
+    lastMissionDate: Optional[str] = None
+    currentMissionAssignment: Optional[str] = None
+
+
+class PilotQualificationsBase(BaseModel):
+    aircraftCertifications: list[str] = Field(default_factory=list)
+    totalFlightHours: float = 0
+    flightHoursPerAircraft: dict[str, float] = Field(default_factory=dict)
+    specializations: list[str] = Field(default_factory=list)
+    trainingLevel: str = "Intermediate"
+    simulatorPerformanceScore: float = 0
+
+
+class PilotPerformanceMetricsBase(BaseModel):
+    avgMissionSuccessRate: float = 0
+    reactionTimeScore: float = 0
+    maneuverAccuracy: float = 0
+    decisionEfficiencyScore: float = 0
+    last5TrainingResults: list[str] = Field(default_factory=list)
+
+
+class PilotMedicalDetailsBase(BaseModel):
+    currentStatus: str = "Fit for Flight"
+    lastMedicalCheckDate: Optional[str] = None
+    nextDueCheck: Optional[str] = None
+    heartRate: Optional[str] = None
+    bloodPressure: Optional[str] = None
+    oxygenSaturation: Optional[str] = None
+    visionStatus: Optional[str] = None
+    gToleranceLevel: Optional[str] = None
+    pastInjuries: list[str] = Field(default_factory=list)
+    surgeries: list[str] = Field(default_factory=list)
+    chronicConditions: list[str] = Field(default_factory=list)
+    medication: list[str] = Field(default_factory=list)
+    fatigueLevel: Optional[str] = None
+    stressLevel: Optional[str] = None
+    sleepQualityScore: Optional[float] = 0
+    cognitiveReadiness: Optional[float] = 0
+    lastClearedForFlight: Optional[str] = None
+    clearedBy: Optional[str] = None
+    clearanceRemarks: Optional[str] = None
+    safeToAssign: bool = True
+
+
+class PilotMedicalLogRead(BaseModel):
+    id: int
+    flightContext: str
+    fatigueLevel: Optional[str] = None
+    stressLevel: Optional[str] = None
+    sleepQualityScore: Optional[float] = None
+    cognitiveReadiness: Optional[float] = None
+    safeToAssign: bool
+    remarks: Optional[str] = None
+    createdAt: str
+
+
 class PilotBase(BaseModel):
     name: str
     registrationNumber: str
@@ -45,7 +114,12 @@ class PilotBase(BaseModel):
 
 
 class PilotCreate(PilotBase):
+    personalDetails: PilotPersonalDetailsBase
+    operationalStatus: PilotOperationalStatusBase = Field(default_factory=PilotOperationalStatusBase)
+    qualifications: PilotQualificationsBase = Field(default_factory=PilotQualificationsBase)
+    performanceMetrics: PilotPerformanceMetricsBase = Field(default_factory=PilotPerformanceMetricsBase)
     medical: PilotMedicalBase = Field(default_factory=PilotMedicalBase)
+    medicalDetails: PilotMedicalDetailsBase = Field(default_factory=PilotMedicalDetailsBase)
     missions: list[PilotMissionBase] = Field(default_factory=list)
 
 
@@ -54,6 +128,12 @@ class PilotRead(PilotBase):
     injury: str
     medicalReport: str
     medical: PilotMedicalRead
+    personalDetails: PilotPersonalDetailsBase
+    operationalStatus: PilotOperationalStatusBase
+    qualifications: PilotQualificationsBase
+    performanceMetrics: PilotPerformanceMetricsBase
+    medicalDetails: PilotMedicalDetailsBase
+    medicalLogs: list[PilotMedicalLogRead] = Field(default_factory=list)
     missions: list[PilotMissionRead]
     trainings: list[PilotTrainingRead] = Field(default_factory=list)
 

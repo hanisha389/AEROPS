@@ -9,6 +9,7 @@ interface PilotOption {
   id: number;
   name: string;
   callSign: string;
+  assignedAircraft?: string | null;
 }
 
 interface AircraftOption {
@@ -37,7 +38,16 @@ const Training = () => {
   const [debrief, setDebrief] = useState<Debrief | null>(null);
   const [running, setRunning] = useState(false);
 
+  const isBasicManeuvers = trainingType === "basic_maneuvers";
   const maxPilots = useMemo(() => (trainingType === "one_v_one_dogfight" ? 2 : 1), [trainingType]);
+  const selectedPrimaryAircraft = selectedAircraft[0] ?? null;
+
+  const pilotsForSelectedAircraft = useMemo(() => {
+    if (!selectedPrimaryAircraft) {
+      return [];
+    }
+    return pilotOptions.filter((pilot) => pilot.assignedAircraft === selectedPrimaryAircraft);
+  }, [pilotOptions, selectedPrimaryAircraft]);
 
   useEffect(() => {
     api.getPilots().then(setPilotOptions);
@@ -48,6 +58,17 @@ const Training = () => {
     setSelectedPilots([]);
     setSelectedAircraft([]);
   }, [trainingType]);
+
+  useEffect(() => {
+    if (!isBasicManeuvers) {
+      return;
+    }
+    if (pilotsForSelectedAircraft.length === 1) {
+      setSelectedPilots([pilotsForSelectedAircraft[0].id]);
+      return;
+    }
+    setSelectedPilots((prev) => prev.filter((id) => pilotsForSelectedAircraft.some((pilot) => pilot.id === id)).slice(0, 1));
+  }, [isBasicManeuvers, pilotsForSelectedAircraft]);
 
   const togglePilot = (pilotId: number) => {
     setSelectedPilots((prev) => {
@@ -62,6 +83,10 @@ const Training = () => {
   };
 
   const toggleAircraft = (aircraftId: string) => {
+    if (isBasicManeuvers) {
+      setSelectedAircraft((prev) => (prev[0] === aircraftId ? [] : [aircraftId]));
+      return;
+    }
     setSelectedAircraft((prev) => {
       if (prev.includes(aircraftId)) {
         return prev.filter((id) => id !== aircraftId);
@@ -75,6 +100,18 @@ const Training = () => {
 
   const runTraining = async (event: FormEvent) => {
     event.preventDefault();
+
+    if (isBasicManeuvers) {
+      if (selectedAircraft.length !== 1) {
+        window.alert("Select exactly one aircraft for Basic Maneuvers.");
+        return;
+      }
+      if (selectedPilots.length !== 1) {
+        window.alert("Select one assigned pilot for the selected aircraft.");
+        return;
+      }
+    }
+
     if (selectedPilots.length !== maxPilots) {
       window.alert(`Select exactly ${maxPilots} pilot(s).`);
       return;
@@ -114,23 +151,25 @@ const Training = () => {
             </select>
           </div>
 
-          <div>
-            <p className="mb-2 font-rajdhani text-xs text-muted-foreground">Select Pilot(s)</p>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              {pilotOptions.map((pilot) => {
-                const checked = selectedPilots.includes(pilot.id);
-                return (
-                  <label key={pilot.id} className={`flex cursor-pointer items-center justify-between border px-3 py-2 ${checked ? "border-primary bg-primary/10" : "border-border/40"}`}>
-                    <span className="font-rajdhani text-sm">{pilot.callSign} ({pilot.name})</span>
-                    <input type="checkbox" checked={checked} onChange={() => togglePilot(pilot.id)} />
-                  </label>
-                );
-              })}
+          {!isBasicManeuvers && (
+            <div>
+              <p className="mb-2 font-rajdhani text-xs text-muted-foreground">Select Pilot(s)</p>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                {pilotOptions.map((pilot) => {
+                  const checked = selectedPilots.includes(pilot.id);
+                  return (
+                    <label key={pilot.id} className={`flex cursor-pointer items-center justify-between border px-3 py-2 ${checked ? "border-primary bg-primary/10" : "border-border/40"}`}>
+                      <span className="font-rajdhani text-sm">{pilot.callSign} ({pilot.name})</span>
+                      <input type="checkbox" checked={checked} onChange={() => togglePilot(pilot.id)} />
+                    </label>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
-            <p className="mb-2 font-rajdhani text-xs text-muted-foreground">Select Aircraft</p>
+            <p className="mb-2 font-rajdhani text-xs text-muted-foreground">{isBasicManeuvers ? "Select Aircraft (Required)" : "Select Aircraft"}</p>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {aircraftOptions.map((aircraft) => {
                 const checked = selectedAircraft.includes(aircraft.id);
@@ -143,6 +182,40 @@ const Training = () => {
               })}
             </div>
           </div>
+
+          {isBasicManeuvers && selectedPrimaryAircraft && (
+            <div>
+              <p className="mb-2 font-rajdhani text-xs text-muted-foreground">Assigned Pilot</p>
+              {pilotsForSelectedAircraft.length === 0 && (
+                <p className="border border-border/40 bg-background/30 px-3 py-2 font-rajdhani text-xs text-muted-foreground">
+                  No pilot is assigned to the selected aircraft.
+                </p>
+              )}
+              {pilotsForSelectedAircraft.length === 1 && (
+                <p className="border border-primary/40 bg-primary/10 px-3 py-2 font-rajdhani text-sm text-primary">
+                  Auto-selected: {pilotsForSelectedAircraft[0].callSign} ({pilotsForSelectedAircraft[0].name})
+                </p>
+              )}
+              {pilotsForSelectedAircraft.length > 1 && (
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {pilotsForSelectedAircraft.map((pilot) => {
+                    const checked = selectedPilots.includes(pilot.id);
+                    return (
+                      <label key={pilot.id} className={`flex cursor-pointer items-center justify-between border px-3 py-2 ${checked ? "border-primary bg-primary/10" : "border-border/40"}`}>
+                        <span className="font-rajdhani text-sm">{pilot.callSign} ({pilot.name})</span>
+                        <input
+                          type="radio"
+                          name="basic-maneuvers-pilot"
+                          checked={checked}
+                          onChange={() => setSelectedPilots([pilot.id])}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           <button type="submit" disabled={running} className="border border-primary px-4 py-2 font-orbitron text-xs text-primary">
             {running ? "RUNNING TRAINING..." : "COMPLETE TRAINING"}

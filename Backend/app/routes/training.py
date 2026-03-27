@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies.db import get_db
 from app.models.aircraft import Aircraft, AircraftComponentStatus, AircraftIssue
-from app.models.pilot import Pilot, PilotMedical, PilotMission
+from app.models.pilot import Pilot, PilotMedical, PilotMedicalDetails, PilotMedicalLog, PilotMission
 from app.models.training import PilotTrainingLog
 from app.schemas.training import TrainingDebriefEvent, TrainingRunRequest, TrainingRunResponse
 
@@ -66,6 +66,12 @@ def run_training(payload: TrainingRunRequest, db: Session = Depends(get_db)):
             db.add(medical)
             db.flush()
 
+        medical_details = pilot.medical_details
+        if not medical_details:
+            medical_details = PilotMedicalDetails(pilot_id=pilot.id, current_status="Fit for Flight", safe_to_assign=True)
+            db.add(medical_details)
+            db.flush()
+
         injury_roll = random.random()
         if injury_roll < 0.35:
             injury = random.choice(["Severe headache", "Neck strain", "Shoulder strain", "None"])
@@ -74,6 +80,37 @@ def run_training(payload: TrainingRunRequest, db: Session = Depends(get_db)):
             medical.last_status = "Under observation" if injury != "None" else "Fit for duty"
             if injury != "None":
                 events.append(TrainingDebriefEvent(kind="pilot", message=f"{pilot.call_sign} reported {injury}."))
+
+        fatigue_level = random.choice(["Low", "Medium", "High"])
+        stress_level = random.choice(["Low", "Medium", "High"])
+        sleep_score = random.randint(55, 98)
+        cognitive_score = random.randint(50, 98)
+        safe_to_assign = fatigue_level != "High" and stress_level != "High" and cognitive_score >= 65
+
+        medical_details.current_status = "Fit for Flight" if safe_to_assign else "Temporarily Grounded"
+        medical_details.fatigue_level = fatigue_level
+        medical_details.stress_level = stress_level
+        medical_details.sleep_quality_score = sleep_score
+        medical_details.cognitive_readiness = cognitive_score
+        medical_details.safe_to_assign = safe_to_assign
+        medical_details.last_medical_check_date = now.split("T")[0]
+        medical_details.clearance_remarks = (
+            "Fit for high-G maneuvers" if safe_to_assign else "Rest and reassessment required before mission assignment"
+        )
+
+        db.add(
+            PilotMedicalLog(
+                pilot_id=pilot.id,
+                flight_context=f"Training - {payload.trainingType}",
+                fatigue_level=fatigue_level,
+                stress_level=stress_level,
+                sleep_quality_score=sleep_score,
+                cognitive_readiness=cognitive_score,
+                safe_to_assign=safe_to_assign,
+                remarks=medical_details.clearance_remarks,
+                created_at=now,
+            )
+        )
 
         db.add(
             PilotMission(

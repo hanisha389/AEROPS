@@ -11,7 +11,6 @@ interface Aircraft {
   healthStatus?: string;
   lastMaintenance?: string;
   assignedPilots: string[];
-  missionDetails: { name: string; notes?: string }[];
   componentStatus: Record<string, ComponentState>;
   openIssues: {
     id: number;
@@ -53,7 +52,6 @@ const AircraftDetail = () => {
   const [aircraft, setAircraft] = useState<Aircraft | null>(null);
   const [pilotOptions, setPilotOptions] = useState<Pilot[]>([]);
   const [assignedPilotInput, setAssignedPilotInput] = useState("");
-  const [missionInput, setMissionInput] = useState("");
   const [health, setHealth] = useState<HealthMap>(defaultHealth);
   const [selectedPart, setSelectedPart] = useState<keyof HealthMap>("engine");
 
@@ -62,7 +60,6 @@ const AircraftDetail = () => {
     api.getAircraftById(id).then((data: Aircraft) => {
       setAircraft(data);
       setAssignedPilotInput(data.assignedPilots.join(", "));
-      setMissionInput(data.missionDetails.map((m) => m.name).join("\n"));
       if (data.componentStatus && Object.keys(data.componentStatus).length > 0) {
         setHealth({ ...defaultHealth, ...data.componentStatus });
       }
@@ -82,7 +79,6 @@ const AircraftDetail = () => {
     if (!aircraft) return;
 
     const assignedPilots = assignedPilotInput.split(",").map((item) => item.trim()).filter(Boolean);
-    const missions = missionInput.split("\n").map((item) => item.trim()).filter(Boolean).map((name) => ({ name }));
 
     const updated = await api.updateAircraft(aircraft.id, {
       id: aircraft.id,
@@ -91,7 +87,7 @@ const AircraftDetail = () => {
       healthStatus: `${selectedPart}:${health[selectedPart]}`,
       lastMaintenance: aircraft.lastMaintenance,
       assignedPilots,
-      missions,
+      missions: [],
     });
 
     setAircraft(updated);
@@ -127,9 +123,6 @@ const AircraftDetail = () => {
 
           <label className="block font-rajdhani text-xs text-muted-foreground">Assigned Pilots (comma separated)</label>
           <input className="w-full border border-border bg-background/40 px-3 py-2" value={assignedPilotInput} onChange={(e) => setAssignedPilotInput(e.target.value)} />
-
-          <label className="block font-rajdhani text-xs text-muted-foreground">Missions (one per line)</label>
-          <textarea className="min-h-32 w-full border border-border bg-background/40 px-3 py-2" value={missionInput} onChange={(e) => setMissionInput(e.target.value)} />
 
           <div className="text-xs text-muted-foreground">
             Pilot Call Sign Suggestions: {pilotOptions.map((pilot) => pilot.callSign).join(", ")}

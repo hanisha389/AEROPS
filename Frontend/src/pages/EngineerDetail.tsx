@@ -5,11 +5,13 @@ import PageHeader from "@/components/PageHeader";
 import { api, OpenIssue } from "@/lib/api";
 
 interface MaintenanceLog {
+  id: number;
   date: string;
   aircraft?: string;
   type: string;
   description?: string;
   isCurrent?: boolean;
+  completionStatus?: string;
 }
 
 interface Engineer {
@@ -37,6 +39,12 @@ const EngineerDetail = () => {
     if (!engineer) return [];
     return [...engineer.maintenanceLogs].sort((a, b) => b.date.localeCompare(a.date));
   }, [engineer]);
+
+  const updateLogStatus = async (logId: number, completionStatus: string) => {
+    if (!engineer) return;
+    const updated = await api.updateEngineerLogStatus(engineer.id, logId, completionStatus);
+    setEngineer(updated);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -154,6 +162,18 @@ const EngineerDetail = () => {
                   </div>
                   <p className="font-rajdhani text-xs text-muted-foreground">{log.type}</p>
                   <p className="font-rajdhani text-xs text-muted-foreground/80">{log.description || "No details"}</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <p className="font-rajdhani text-xs text-muted-foreground">Status:</p>
+                    <select
+                      className="border border-border bg-background/40 px-2 py-1 font-rajdhani text-xs"
+                      value={log.completionStatus || "Pending"}
+                      onChange={(e) => updateLogStatus(log.id, e.target.value)}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                  </div>
                 </div>
               ))}
             </div>

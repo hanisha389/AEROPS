@@ -10,7 +10,6 @@ interface Aircraft {
   name: string;
   model: string;
   assignedPilot: string;
-  missions: string[];
 }
 
 const AircraftInfo = () => {
@@ -55,7 +54,6 @@ const AircraftInfo = () => {
               <div className="text-right">
                 <p className="font-rajdhani text-xs text-muted-foreground">Assigned Pilot</p>
                 <p className="font-rajdhani text-sm text-primary">{ac.assignedPilot}</p>
-                <p className="font-rajdhani text-xs text-muted-foreground">Missions: {ac.missions.length}</p>
               </div>
             </motion.button>
           ))}

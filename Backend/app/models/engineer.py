@@ -30,3 +30,15 @@ class EngineerMaintenanceLog(Base):
     log_date = Column(String(50), nullable=False)
 
     engineer = relationship("Engineer", back_populates="maintenance_logs")
+    report = relationship("EngineerMaintenanceReport", back_populates="log", uselist=False, cascade="all, delete-orphan")
+
+
+class EngineerMaintenanceReport(Base):
+    __tablename__ = "engineer_maintenance_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    maintenance_log_id = Column(Integer, ForeignKey("engineer_maintenance_logs.id", ondelete="CASCADE"), nullable=False, unique=True)
+    completion_status = Column(String(30), nullable=False, default="Pending")
+    updated_at = Column(String(50), nullable=False)
+
+    log = relationship("EngineerMaintenanceLog", back_populates="report")
