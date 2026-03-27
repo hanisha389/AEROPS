@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.dependencies.db import get_db
 from app.models.pilot import Pilot, PilotMedical, PilotMission
+from app.models.training import PilotTrainingLog
 from app.schemas.pilot import PilotCreate, PilotRead
 
 router = APIRouter(prefix="/pilots", tags=["pilots"])
@@ -19,6 +20,16 @@ def _to_schema(pilot: Pilot) -> PilotRead:
             "notes": mission.notes,
         }
         for mission in pilot.missions
+    ]
+    trainings = [
+        {
+            "trainingType": entry.training_type,
+            "result": entry.result,
+            "aircraftId": entry.aircraft_id,
+            "debrief": entry.debrief,
+            "createdAt": entry.created_at,
+        }
+        for entry in sorted(pilot.trainings, key=lambda item: item.created_at, reverse=True)
     ]
     medical_status = "Fit for duty" if medical.fit_for_duty else "Not fit for duty"
     report = f"{medical_status}. Last status: {medical.last_status}"
@@ -41,6 +52,7 @@ def _to_schema(pilot: Pilot) -> PilotRead:
             "lastStatus": medical.last_status,
         },
         missions=missions,
+        trainings=trainings,
     )
 
 
@@ -48,6 +60,14 @@ def _to_schema(pilot: Pilot) -> PilotRead:
 def list_pilots(db: Session = Depends(get_db)):
     pilots = db.query(Pilot).all()
     return [_to_schema(pilot) for pilot in pilots]
+
+
+@router.get("/{pilot_id}", response_model=PilotRead)
+def get_pilot(pilot_id: int, db: Session = Depends(get_db)):
+        pilot = db.query(Pilot).filter(Pilot.id == pilot_id).first()
+        if not pilot:
+                raise HTTPException(status_code=404, detail="Pilot not found")
+        return _to_schema(pilot)
 
 
 @router.post("", response_model=PilotRead, status_code=status.HTTP_201_CREATED)

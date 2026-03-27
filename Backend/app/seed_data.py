@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from app.models.access_code import AccessCode
 from app.models.pilot import Pilot, PilotMedical, PilotMission
 from app.models.engineer import Engineer, EngineerMaintenanceLog
-from app.models.aircraft import Aircraft, AircraftMission, AircraftPilotAssignment
+from app.models.aircraft import Aircraft, AircraftMission, AircraftPilotAssignment, AircraftComponentStatus
 
 
 def seed(db: Session) -> None:
@@ -95,6 +95,11 @@ def seed(db: Session) -> None:
             [
                 AircraftPilotAssignment(aircraft_id=aircraft.id, pilot_name="Viper"),
                 AircraftMission(aircraft_id=aircraft.id, mission_name="Operation Nightfall", notes="Recon mission"),
+                AircraftComponentStatus(aircraft_id=aircraft.id, component="engine", status="Good", notes=""),
+                AircraftComponentStatus(aircraft_id=aircraft.id, component="wings", status="Good", notes=""),
+                AircraftComponentStatus(aircraft_id=aircraft.id, component="avionics", status="Good", notes=""),
+                AircraftComponentStatus(aircraft_id=aircraft.id, component="fuel", status="Good", notes=""),
+                AircraftComponentStatus(aircraft_id=aircraft.id, component="landingGear", status="Good", notes=""),
             ]
         )
 

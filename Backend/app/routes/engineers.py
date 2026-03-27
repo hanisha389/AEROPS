@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.dependencies.db import get_db
 from app.models.engineer import Engineer, EngineerMaintenanceLog
-from app.schemas.engineer import EngineerCreate, EngineerRead
+from app.models.aircraft import AircraftIssue
+from app.schemas.engineer import EngineerCreate, EngineerMaintenanceLogCreate, EngineerRead
 
 router = APIRouter(prefix="/engineers", tags=["engineers"])
 
@@ -40,6 +41,31 @@ def list_engineers(db: Session = Depends(get_db)):
     return [_to_schema(item) for item in engineers]
 
 
+@router.get("/open-issues")
+def list_open_issues(db: Session = Depends(get_db)):
+    issues = db.query(AircraftIssue).filter(AircraftIssue.status.in_(["Open", "Assigned"])).all()
+    return [
+        {
+            "id": issue.id,
+            "aircraftId": issue.aircraft_id,
+            "component": issue.component,
+            "severity": issue.severity,
+            "description": issue.description,
+            "status": issue.status,
+            "createdAt": issue.created_at,
+        }
+        for issue in issues
+    ]
+
+
+@router.get("/{engineer_id}", response_model=EngineerRead)
+def get_engineer(engineer_id: int, db: Session = Depends(get_db)):
+    engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+    if not engineer:
+        raise HTTPException(status_code=404, detail="Engineer not found")
+    return _to_schema(engineer)
+
+
 @router.post("", response_model=EngineerRead, status_code=status.HTTP_201_CREATED)
 def create_engineer(payload: EngineerCreate, db: Session = Depends(get_db)):
     existing = db.query(Engineer).filter(Engineer.service_id == payload.employeeId).first()
@@ -69,6 +95,39 @@ def create_engineer(payload: EngineerCreate, db: Session = Depends(get_db)):
                 log_date=log.date,
             )
         )
+
+    db.commit()
+    db.refresh(engineer)
+    return _to_schema(engineer)
+
+
+@router.post("/{engineer_id}/logs", response_model=EngineerRead)
+def add_engineer_log(engineer_id: int, payload: EngineerMaintenanceLogCreate, db: Session = Depends(get_db)):
+    engineer = db.query(Engineer).filter(Engineer.id == engineer_id).first()
+    if not engineer:
+        raise HTTPException(status_code=404, detail="Engineer not found")
+
+    if payload.isCurrent:
+        db.query(EngineerMaintenanceLog).filter(
+            EngineerMaintenanceLog.engineer_id == engineer_id,
+            EngineerMaintenanceLog.is_current.is_(True),
+        ).update({"is_current": False})
+
+    db.add(
+        EngineerMaintenanceLog(
+            engineer_id=engineer_id,
+            aircraft_id=payload.aircraft,
+            work_item=payload.type,
+            notes=payload.description,
+            is_current=payload.isCurrent,
+            log_date=payload.date,
+        )
+    )
+
+    if payload.issueId is not None:
+        issue = db.query(AircraftIssue).filter(AircraftIssue.id == payload.issueId).first()
+        if issue:
+            issue.status = "Assigned"
 
     db.commit()
     db.refresh(engineer)

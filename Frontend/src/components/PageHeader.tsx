@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 
-const PageHeader = ({ title }: { title: string }) => {
+const PageHeader = ({ title, backTo = '/menu' }: { title: string; backTo?: string }) => {
   const navigate = useNavigate();
 
   return (
@@ -13,7 +13,7 @@ const PageHeader = ({ title }: { title: string }) => {
       transition={{ duration: 0.4 }}
     >
       <button
-        onClick={() => navigate('/menu')}
+        onClick={() => navigate(backTo)}
         className="flex items-center gap-2 font-rajdhani text-sm tracking-wider text-muted-foreground transition-colors hover:text-primary"
       >
         <ArrowLeft className="h-4 w-4" />

@@ -18,6 +18,7 @@ class Pilot(Base):
 
     medical = relationship("PilotMedical", back_populates="pilot", uselist=False, cascade="all, delete-orphan")
     missions = relationship("PilotMission", back_populates="pilot", cascade="all, delete-orphan")
+    trainings = relationship("PilotTrainingLog", back_populates="pilot", cascade="all, delete-orphan")
 
 
 class PilotMedical(Base):

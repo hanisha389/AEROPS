@@ -14,6 +14,8 @@ class Aircraft(Base):
 
     assignments = relationship("AircraftPilotAssignment", back_populates="aircraft", cascade="all, delete-orphan")
     missions = relationship("AircraftMission", back_populates="aircraft", cascade="all, delete-orphan")
+    component_statuses = relationship("AircraftComponentStatus", back_populates="aircraft", cascade="all, delete-orphan")
+    issues = relationship("AircraftIssue", back_populates="aircraft", cascade="all, delete-orphan")
 
 
 class AircraftPilotAssignment(Base):
@@ -35,3 +37,29 @@ class AircraftMission(Base):
     notes = Column(Text, nullable=True)
 
     aircraft = relationship("Aircraft", back_populates="missions")
+
+
+class AircraftComponentStatus(Base):
+    __tablename__ = "aircraft_component_statuses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    aircraft_id = Column(String(50), ForeignKey("aircraft.id", ondelete="CASCADE"), nullable=False, index=True)
+    component = Column(String(50), nullable=False)
+    status = Column(String(20), nullable=False, default="Good")
+    notes = Column(Text, nullable=True)
+
+    aircraft = relationship("Aircraft", back_populates="component_statuses")
+
+
+class AircraftIssue(Base):
+    __tablename__ = "aircraft_issues"
+
+    id = Column(Integer, primary_key=True, index=True)
+    aircraft_id = Column(String(50), ForeignKey("aircraft.id", ondelete="CASCADE"), nullable=False, index=True)
+    component = Column(String(50), nullable=False)
+    severity = Column(String(20), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(20), nullable=False, default="Open")
+    created_at = Column(String(50), nullable=False)
+
+    aircraft = relationship("Aircraft", back_populates="issues")

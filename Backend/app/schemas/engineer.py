@@ -21,11 +21,15 @@ class EngineerBase(BaseModel):
     specialization: str
     status: str = "On Duty"
     onHoliday: bool = False
-    image: str = Field(default="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&h=300&fit=crop&crop=face")
+    image: str = Field(..., min_length=3)
 
 
 class EngineerCreate(EngineerBase):
     maintenanceLogs: list[EngineerMaintenanceLogBase] = Field(default_factory=list)
+
+
+class EngineerMaintenanceLogCreate(EngineerMaintenanceLogBase):
+    issueId: Optional[int] = None
 
 
 class EngineerRead(EngineerBase):

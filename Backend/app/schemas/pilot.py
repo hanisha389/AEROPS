@@ -25,6 +25,14 @@ class PilotMissionRead(PilotMissionBase):
     pass
 
 
+class PilotTrainingRead(BaseModel):
+    trainingType: str
+    result: Optional[str] = None
+    aircraftId: Optional[str] = None
+    debrief: Optional[str] = None
+    createdAt: str
+
+
 class PilotBase(BaseModel):
     name: str
     registrationNumber: str
@@ -33,7 +41,7 @@ class PilotBase(BaseModel):
     assignedAircraft: Optional[str] = None
     status: str = "Active"
     onHoliday: bool = False
-    image: str = Field(default="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop&crop=face")
+    image: str = Field(..., min_length=3)
 
 
 class PilotCreate(PilotBase):
@@ -47,6 +55,7 @@ class PilotRead(PilotBase):
     medicalReport: str
     medical: PilotMedicalRead
     missions: list[PilotMissionRead]
+    trainings: list[PilotTrainingRead] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

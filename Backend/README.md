@@ -26,4 +26,10 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `POST /api/engineers`
 - `GET /api/aircraft`
 - `POST /api/aircraft`
-- `POST /api/add`
+- `GET /api/aircraft/{id}`
+- `PUT /api/aircraft/{id}`
+- `GET /api/pilots/{id}`
+- `GET /api/engineers/{id}`
+- `POST /api/engineers/{id}/logs`
+- `GET /api/engineers/open-issues`
+- `POST /api/training/run`

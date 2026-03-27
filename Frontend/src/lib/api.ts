@@ -42,6 +42,7 @@ export interface EngineerPayload {
     description?: string;
     isCurrent: boolean;
     date: string;
+    issueId?: number;
   }[];
 }
 
@@ -58,20 +59,42 @@ export interface AircraftPayload {
   }[];
 }
 
+export interface TrainingRunPayload {
+  trainingType: "basic_maneuvers" | "one_v_one_dogfight" | "precision_bomb_drop";
+  pilotIds: number[];
+  aircraftIds: string[];
+}
+
+export interface OpenIssue {
+  id: number;
+  aircraftId: string;
+  component: string;
+  severity: string;
+  description?: string;
+  status: string;
+  createdAt: string;
+}
+
 export const api = {
   getPin: () => client.get("/pin").then((res) => res.data),
   verifyPin: (code: string) => client.post("/pin/verify", { code }).then((res) => res.data),
   updatePin: (code: string) => client.put("/pin", { code }).then((res) => res.data),
 
   getPilots: () => client.get("/pilots").then((res) => res.data),
+  getPilotById: (id: number) => client.get(`/pilots/${id}`).then((res) => res.data),
   addPilot: (payload: PilotPayload) => client.post("/pilots", payload).then((res) => res.data),
 
   getEngineers: () => client.get("/engineers").then((res) => res.data),
+  getEngineerById: (id: number) => client.get(`/engineers/${id}`).then((res) => res.data),
   addEngineer: (payload: EngineerPayload) => client.post("/engineers", payload).then((res) => res.data),
+  addEngineerLog: (engineerId: number, payload: EngineerPayload["maintenanceLogs"][number]) =>
+    client.post(`/engineers/${engineerId}/logs`, payload).then((res) => res.data),
+  getOpenIssues: (): Promise<OpenIssue[]> => client.get("/engineers/open-issues").then((res) => res.data),
 
   getAircrafts: () => client.get("/aircraft").then((res) => res.data),
+  getAircraftById: (id: string) => client.get(`/aircraft/${id}`).then((res) => res.data),
   addAircraft: (payload: AircraftPayload) => client.post("/aircraft", payload).then((res) => res.data),
+  updateAircraft: (id: string, payload: AircraftPayload) => client.put(`/aircraft/${id}`, payload).then((res) => res.data),
 
-  addEntity: (entityType: "pilot" | "engineer" | "aircraft", payload: PilotPayload | EngineerPayload | AircraftPayload) =>
-    client.post("/add", { entityType, payload }).then((res) => res.data),
+  runTraining: (payload: TrainingRunPayload) => client.post("/training/run", payload).then((res) => res.data),
 };
