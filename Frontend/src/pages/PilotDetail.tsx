@@ -3,6 +3,9 @@ import { useParams } from "react-router-dom";
 import BackgroundLayout from "@/components/BackgroundLayout";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api";
+import StatusBadge from "@/components/StatusBadge";
+import IAFRankInsignia from "@/components/IAFRankInsignia";
+import HumanBodyModel from "@/components/HumanBodyModel";
 
 interface Mission {
   name: string;
@@ -118,11 +121,19 @@ const PilotDetail = () => {
       <div className="grid grid-cols-1 gap-5 p-6 lg:grid-cols-3">
         <div className="border border-border/40 bg-card/30 p-4 lg:col-span-2">
           <div className="flex flex-col gap-4 md:flex-row">
-            <img src={pilot.image} alt={pilot.name} className="h-72 w-64 object-cover" />
-            <div className="space-y-2">
-              <h2 className="font-orbitron text-lg text-primary">{pilot.name}</h2>
+            <div className="h-[30rem] w-full overflow-hidden border border-border/30 bg-black/30 md:w-80 lg:h-[32rem] lg:w-84">
+              <img src={pilot.image} alt={pilot.name} className="h-full w-full object-cover object-[50%_12%]" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="font-orbitron text-xl text-primary sm:text-2xl">{pilot.name}</h2>
+                <StatusBadge status={pilot.status || "Active"} align="right" />
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="font-rajdhani text-base text-muted-foreground">Rank:</p>
+                <IAFRankInsignia rank={pilot.rank} short />
+              </div>
               <p className="font-rajdhani text-sm text-muted-foreground">Service Number: <span className="text-primary">{pilot.personalDetails.serviceNumber}</span></p>
-              <p className="font-rajdhani text-sm text-muted-foreground">Rank: <span className="text-primary">{pilot.rank}</span></p>
               <p className="font-rajdhani text-sm text-muted-foreground">Call Sign: <span className="text-primary">{pilot.callSign}</span></p>
               <p className="font-rajdhani text-sm text-muted-foreground">Date of Birth: <span className="text-primary">{pilot.personalDetails.dateOfBirth || "N/A"}</span></p>
               <p className="font-rajdhani text-sm text-muted-foreground">Date of Joining: <span className="text-primary">{pilot.personalDetails.dateOfJoining || "N/A"}</span></p>
@@ -144,31 +155,29 @@ const PilotDetail = () => {
 
         <div className="border border-border/40 bg-card/30 p-4">
           <h3 className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">MEDICAL INFO</h3>
-          <p className="font-rajdhani text-sm text-muted-foreground">Current Status: <span className="text-primary">{pilot.medicalDetails.currentStatus}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Safe To Assign: <span className="text-primary">{pilot.medicalDetails.safeToAssign ? "YES" : "NO"}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Heart Rate: <span className="text-primary">{pilot.medicalDetails.heartRate || "N/A"}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Blood Pressure: <span className="text-primary">{pilot.medicalDetails.bloodPressure || "N/A"}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Oxygen Saturation: <span className="text-primary">{pilot.medicalDetails.oxygenSaturation || "N/A"}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Fatigue: <span className="text-primary">{pilot.medicalDetails.fatigueLevel || "N/A"}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Stress: <span className="text-primary">{pilot.medicalDetails.stressLevel || "N/A"}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Sleep Score: <span className="text-primary">{pilot.medicalDetails.sleepQualityScore}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Cognitive Readiness: <span className="text-primary">{pilot.medicalDetails.cognitiveReadiness}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Cleared By: <span className="text-primary">{pilot.medicalDetails.clearedBy || "N/A"}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Clearance Remarks: <span className="text-primary">{pilot.medicalDetails.clearanceRemarks || "N/A"}</span></p>
-          <div className="mt-3 border-t border-border/30 pt-3">
-            <p className="mb-1 font-orbitron text-[11px] tracking-[0.12em] text-muted-foreground">MEDICAL LOGS</p>
-            <div className="space-y-1">
-              {pilot.medicalLogs.length === 0 && <p className="font-rajdhani text-xs text-muted-foreground">No logs yet.</p>}
-              {pilot.medicalLogs.slice(0, 6).map((entry) => (
-                <p key={entry.id} className="font-rajdhani text-xs text-muted-foreground">
-                  {entry.createdAt.split("T")[0]} - {entry.flightContext} - {entry.safeToAssign ? "SAFE" : "NOT SAFE"}
-                </p>
-              ))}
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1.15fr]">
+            <div className="space-y-1.5 bg-background/20 p-3">
+              <p className="font-rajdhani text-base text-muted-foreground">Current Status: <span className="text-primary">{pilot.medicalDetails.currentStatus}</span></p>
+              <p className="font-rajdhani text-base text-muted-foreground">Safe To Assign: <span className="text-primary">{pilot.medicalDetails.safeToAssign ? "YES" : "NO"}</span></p>
+              <p className="font-rajdhani text-base text-muted-foreground">Heart Rate: <span className="text-primary">{pilot.medicalDetails.heartRate || "N/A"}</span></p>
+              <p className="font-rajdhani text-base text-muted-foreground">Blood Pressure: <span className="text-primary">{pilot.medicalDetails.bloodPressure || "N/A"}</span></p>
+              <p className="font-rajdhani text-base text-muted-foreground">Oxygen Saturation: <span className="text-primary">{pilot.medicalDetails.oxygenSaturation || "N/A"}</span></p>
+              <p className="font-rajdhani text-base text-muted-foreground">Fatigue: <span className="text-primary">{pilot.medicalDetails.fatigueLevel || "N/A"}</span></p>
+              <p className="font-rajdhani text-base text-muted-foreground">Stress: <span className="text-primary">{pilot.medicalDetails.stressLevel || "N/A"}</span></p>
+              <p className="font-rajdhani text-base text-muted-foreground">Sleep Score: <span className="text-primary">{pilot.medicalDetails.sleepQualityScore}</span></p>
+              <p className="font-rajdhani text-base text-muted-foreground">Cognitive Readiness: <span className="text-primary">{pilot.medicalDetails.cognitiveReadiness}</span></p>
+              <p className="font-rajdhani text-base text-muted-foreground">Cleared By: <span className="text-primary">{pilot.medicalDetails.clearedBy || "N/A"}</span></p>
+              <p className="font-rajdhani text-base text-muted-foreground">Clearance Remarks: <span className="text-primary">{pilot.medicalDetails.clearanceRemarks || "N/A"}</span></p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <div className="flex min-h-[28.5rem] items-start justify-center bg-background/20 px-4 pt-1 pb-3">
+                <HumanBodyModel />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:col-span-3 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:col-span-2">
           <div className="border border-border/40 bg-card/30 p-4">
             <h3 className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">MISSION DETAILS</h3>
             <div className="space-y-2">
@@ -198,6 +207,18 @@ const PilotDetail = () => {
                 </details>
               ))}
             </div>
+          </div>
+        </div>
+
+        <div className="border border-border/40 bg-card/30 p-4 lg:col-start-3 lg:row-start-2 lg:self-start">
+          <h3 className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">MEDICAL LOGS</h3>
+          <div className="space-y-1">
+            {pilot.medicalLogs.length === 0 && <p className="font-rajdhani text-sm text-muted-foreground">No logs yet.</p>}
+            {pilot.medicalLogs.slice(0, 6).map((entry) => (
+              <p key={entry.id} className="font-rajdhani text-sm text-muted-foreground">
+                {entry.createdAt.split("T")[0]} - {entry.flightContext} - {entry.safeToAssign ? "SAFE" : "NOT SAFE"}
+              </p>
+            ))}
           </div>
         </div>
       </div>

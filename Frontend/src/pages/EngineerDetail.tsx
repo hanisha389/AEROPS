@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import BackgroundLayout from "@/components/BackgroundLayout";
 import PageHeader from "@/components/PageHeader";
 import { api, OpenIssue } from "@/lib/api";
+import StatusBadge from "@/components/StatusBadge";
 
 interface MaintenanceLog {
   id: number;
@@ -99,12 +100,15 @@ const EngineerDetail = () => {
       <PageHeader title="ENGINEER DETAILS" backTo="/engineers" />
       <div className="grid grid-cols-1 gap-5 p-6 lg:grid-cols-3">
         <div className="border border-border/40 bg-card/30 p-4 lg:col-span-1">
-          <img src={engineer.image} alt={engineer.name} className="mb-4 h-72 w-full object-cover" />
-          <h2 className="font-orbitron text-lg text-primary">{engineer.name}</h2>
-          <p className="font-rajdhani text-sm text-muted-foreground">ID: <span className="text-primary">{engineer.employeeId}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Role: <span className="text-primary">{engineer.role}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Specialization: <span className="text-primary">{engineer.specialization}</span></p>
-          <p className="font-rajdhani text-sm text-muted-foreground">Status: <span className="text-primary">{engineer.status}</span></p>
+          <div className="mb-4 h-[30rem] w-full overflow-hidden border border-border/30 bg-black/30">
+            <img src={engineer.image} alt={engineer.name} className="h-full w-full object-cover object-[50%_20%]" />
+          </div>
+          <StatusBadge status={engineer.status || "Busy"} align="right" />
+          <h2 className="mt-3 font-orbitron text-xl text-primary">{engineer.name}</h2>
+          <p className="font-rajdhani text-base text-muted-foreground">ID: <span className="text-primary">{engineer.employeeId}</span></p>
+          <p className="font-rajdhani text-base text-muted-foreground">Role: <span className="text-primary">{engineer.role}</span></p>
+          <p className="font-rajdhani text-base text-muted-foreground">Specialization: <span className="text-primary">{engineer.specialization}</span></p>
+          <p className="font-rajdhani text-base text-muted-foreground">Status: <span className="text-primary">{engineer.status}</span></p>
         </div>
 
         <div className="space-y-5 lg:col-span-2">

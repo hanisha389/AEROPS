@@ -4,13 +4,23 @@ import { motion } from "framer-motion";
 import BackgroundLayout from "@/components/BackgroundLayout";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api";
+import StatusBadge from "@/components/StatusBadge";
+import IAFRankInsignia from "@/components/IAFRankInsignia";
 
 interface Pilot {
   id: number;
   name: string;
   rank: string;
   image: string;
+  status?: string;
 }
+
+const getHighResImage = (url: string) => {
+  if (!url.includes("images.unsplash.com")) return url;
+  return url
+    .replace(/([?&])w=\d+/, "$1w=900")
+    .replace(/([?&])h=\d+/, "$1h=1200");
+};
 
 const PilotInfo = () => {
   const [pilots, setPilots] = useState<Pilot[]>([]);
@@ -42,17 +52,25 @@ const PilotInfo = () => {
             <motion.button
               key={pilot.id}
               onClick={() => navigate(`/pilots/${pilot.id}`)}
-              className="group overflow-hidden border border-border/40 bg-card/30 text-left transition-colors hover:border-primary/60"
+              className="group flex h-full min-h-[26.5rem] flex-col overflow-hidden border border-border/40 bg-card/30 text-left transition-colors hover:border-primary/60 sm:min-h-[29rem]"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05, duration: 0.25 }}
             >
-              <div className="mx-auto w-full max-w-[170px]">
-                <img src={pilot.image} alt={pilot.name} className="h-72 w-full object-contain bg-black/30 grayscale transition-all duration-200 group-hover:grayscale-0" />
+              <div className="h-[17rem] w-full overflow-hidden bg-black/30 sm:h-[19rem]">
+                <img
+                  src={getHighResImage(pilot.image)}
+                  alt={pilot.name}
+                  className="h-full w-full object-cover object-[50%_8%] grayscale transition-all duration-200 group-hover:grayscale-0"
+                />
               </div>
-              <div className="p-4">
-                <p className="font-orbitron text-sm text-primary">{pilot.name}</p>
-                <p className="font-rajdhani text-sm text-muted-foreground">{pilot.rank}</p>
+              <div className="flex flex-1 flex-col justify-end px-3 pb-3 pt-2">
+                <p className="line-clamp-1 font-orbitron text-base leading-tight text-primary sm:text-[1.05rem]">{pilot.name}</p>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <p className="line-clamp-1 font-rajdhani text-[1.02rem] text-muted-foreground">{pilot.rank}</p>
+                  <IAFRankInsignia rank={pilot.rank} short />
+                </div>
+                <StatusBadge status={pilot.status || "Active"} variant="plain" compact />
               </div>
             </motion.button>
           ))}
