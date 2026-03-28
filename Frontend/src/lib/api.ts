@@ -128,6 +128,71 @@ export interface OpenIssue {
   createdAt: string;
 }
 
+export interface MapCoordinate {
+  lat: number;
+  lng: number;
+}
+
+export interface AirspaceZonePayload {
+  countryName: string;
+  center: MapCoordinate;
+  radiusKm: number;
+  zoneType: "friendly" | "neutral" | "enemy";
+}
+
+export interface AirspaceZone extends AirspaceZonePayload {
+  id: number;
+}
+
+export interface EnemyAircraftUnitPayload {
+  aircraftType: string;
+  quantity: number;
+}
+
+export interface WeaponLoadoutItemPayload {
+  aircraftId: string;
+  weaponType: string;
+  quantity: number;
+}
+
+export interface SimulationRunPayload {
+  missionType: "water" | "air" | "ground";
+  waterTargetType?: "cargo_ship" | "warship" | "submarine";
+  routeCoordinates: MapCoordinate[];
+  groundTargetLocation?: MapCoordinate;
+  groundAirDefenseLevel: number;
+  groundDefenseCount: number;
+  enemyAircraftUnits: EnemyAircraftUnitPayload[];
+  aircraftRouteWaypoints: MapCoordinate[];
+  selectedPilotIds: number[];
+  weaponLoadout: WeaponLoadoutItemPayload[];
+}
+
+export interface SimulationPilotContext {
+  id: number;
+  name: string;
+  callSign: string;
+  aircraftId?: string | null;
+}
+
+export interface SimulationResult {
+  baseLocation: MapCoordinate;
+  interceptLocation: MapCoordinate;
+  timeToInterceptMinutes: number;
+  bestAircraftId: string;
+  bestAircraftPath: MapCoordinate[];
+  enemyRoute: MapCoordinate[];
+  explanation: string;
+  successProbability: number;
+  riskLevel: number;
+  fuelFeasibility: number;
+  threatLevel: number;
+  missionEfficiencyScore: number;
+  selectedPilots: SimulationPilotContext[];
+  aircraftUsed: string[];
+  weaponLoadout: WeaponLoadoutItemPayload[];
+}
+
 export const api = {
   getPin: () => client.get("/pin").then((res) => res.data),
   verifyPin: (code: string) => client.post("/pin/verify", { code }).then((res) => res.data),
@@ -152,4 +217,10 @@ export const api = {
   updateAircraft: (id: string, payload: AircraftPayload) => client.put(`/aircraft/${id}`, payload).then((res) => res.data),
 
   runTraining: (payload: TrainingRunPayload) => client.post("/training/run", payload).then((res) => res.data),
+
+  getAirspaceZones: (): Promise<AirspaceZone[]> => client.get("/simulation/airspace-zones").then((res) => res.data),
+  createAirspaceZone: (payload: AirspaceZonePayload): Promise<AirspaceZone> => client.post("/simulation/airspace-zones", payload).then((res) => res.data),
+  getSimulationBase: (): Promise<MapCoordinate> => client.get("/simulation/base").then((res) => res.data),
+  setSimulationBase: (location: MapCoordinate): Promise<MapCoordinate> => client.put("/simulation/base", { location }).then((res) => res.data),
+  runSimulation: (payload: SimulationRunPayload): Promise<SimulationResult> => client.post("/simulation/run", payload).then((res) => res.data),
 };

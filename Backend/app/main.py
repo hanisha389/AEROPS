@@ -7,6 +7,7 @@ from app.routes.pilots import router as pilots_router
 from app.routes.engineers import router as engineers_router
 from app.routes.aircraft import router as aircraft_router
 from app.routes.training import router as training_router
+from app.routes.simulation import router as simulation_router
 
 app = FastAPI(title="AEROPS API", version="0.1.0")
 
@@ -39,3 +40,4 @@ app.include_router(pilots_router, prefix="/api")
 app.include_router(engineers_router, prefix="/api")
 app.include_router(aircraft_router, prefix="/api")
 app.include_router(training_router, prefix="/api")
+app.include_router(simulation_router, prefix="/api")

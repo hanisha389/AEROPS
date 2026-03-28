@@ -1,0 +1,213 @@
+Date : 2026-03-28 21:52:26
+Directory : f:\Aero\AEROPS
+Total : 148 files,  21353 codes, 38 comments, 2244 blanks, all 23635 lines
+
+Languages
++--------------------+------------+------------+------------+------------+------------+
+| language           | files      | code       | comment    | blank      | total      |
++--------------------+------------+------------+------------+------------+------------+
+| JSON               |         12 |      9,439 |          2 |         13 |      9,454 |
+| TypeScript JSX     |         72 |      6,120 |         21 |        803 |      6,944 |
+| Python             |         28 |      1,758 |          0 |        405 |      2,163 |
+| JavaScript JSX     |          6 |      1,070 |          0 |        131 |      1,201 |
+| JSON with Comments |          2 |        691 |          0 |        579 |      1,270 |
+| JavaScript         |          3 |        638 |          0 |        121 |        759 |
+| TypeScript         |         13 |        534 |         12 |         74 |        620 |
+| PostCSS            |          4 |        517 |          1 |         98 |        616 |
+| Database           |          1 |        488 |          0 |          4 |        492 |
+| XML                |          3 |         42 |          0 |          2 |         44 |
+| Markdown           |          2 |         31 |          0 |          9 |         40 |
+| HTML               |          1 |         21 |          2 |          4 |         27 |
+| pip requirements   |          1 |          4 |          0 |          1 |          5 |
++--------------------+------------+------------+------------+------------+------------+
+
+Directories
++---------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                          | files      | code       | comment    | blank      | total      |
++---------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                             |        148 |     21,353 |         38 |      2,244 |     23,635 |
+| Backend                                                       |         31 |      2,279 |          0 |        417 |      2,696 |
+| Backend (Files)                                               |          3 |        521 |          0 |         12 |        533 |
+| Backend\app                                                   |         28 |      1,758 |          0 |        405 |      2,163 |
+| Backend\app (Files)                                           |          4 |        242 |          0 |         26 |        268 |
+| Backend\app\dependencies                                      |          1 |          8 |          0 |          3 |         11 |
+| Backend\app\models                                            |          7 |        236 |          0 |         91 |        327 |
+| Backend\app\routes                                            |          8 |        996 |          0 |        183 |      1,179 |
+| Backend\app\schemas                                           |          8 |        276 |          0 |        102 |        378 |
+| Frontend                                                      |        102 |     16,821 |         38 |      1,500 |     18,359 |
+| Frontend (Files)                                              |         16 |      9,932 |         13 |        603 |     10,548 |
+| Frontend\public                                               |          4 |        253 |          0 |          4 |        257 |
+| Frontend\public (Files)                                       |          1 |         40 |          0 |          1 |         41 |
+| Frontend\public\mock                                          |          3 |        213 |          0 |          3 |        216 |
+| Frontend\src                                                  |         82 |      6,636 |         25 |        893 |      7,554 |
+| Frontend\src (Files)                                          |          5 |        176 |          2 |         33 |        211 |
+| Frontend\src\components                                       |         55 |      3,736 |         15 |        551 |      4,302 |
+| Frontend\src\components (Files)                               |          6 |        255 |          1 |         43 |        299 |
+| Frontend\src\components\ui                                    |         49 |      3,481 |         14 |        508 |      4,003 |
+| Frontend\src\hooks                                            |          2 |        169 |          2 |         36 |        207 |
+| Frontend\src\lib                                              |          2 |        211 |          0 |         23 |        234 |
+| Frontend\src\pages                                            |         15 |      2,312 |          6 |        242 |      2,560 |
+| Frontend\src\test                                             |          2 |         20 |          0 |          4 |         24 |
+| Frontend\src\types                                            |          1 |         12 |          0 |          4 |         16 |
+| sim_logic                                                     |         15 |      2,253 |          0 |        327 |      2,580 |
+| sim_logic (Files)                                             |          4 |        901 |          0 |        150 |      1,051 |
+| sim_logic\assets                                              |          2 |          2 |          0 |          1 |          3 |
+| sim_logic\components                                          |          4 |        569 |          0 |         54 |        623 |
+| sim_logic\data                                                |          4 |        174 |          0 |          4 |        178 |
+| sim_logic\utils                                               |          1 |        607 |          0 |        118 |        725 |
++---------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++---------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| filename                                                      | language           | code       | comment    | blank      | total      |
++---------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| f:\Aero\AEROPS\Backend\README.md                              | Markdown           |         29 |          0 |          7 |         36 |
+| f:\Aero\AEROPS\Backend\aerops.db                              | Database           |        488 |          0 |          4 |        492 |
+| f:\Aero\AEROPS\Backend\app\__init__.py                        | Python             |          0 |          0 |          1 |          1 |
+| f:\Aero\AEROPS\Backend\app\db.py                              | Python             |         11 |          0 |          6 |         17 |
+| f:\Aero\AEROPS\Backend\app\dependencies\db.py                 | Python             |          8 |          0 |          3 |         11 |
+| f:\Aero\AEROPS\Backend\app\main.py                            | Python             |         35 |          0 |          9 |         44 |
+| f:\Aero\AEROPS\Backend\app\models\__init__.py                 | Python             |          0 |          0 |          1 |          1 |
+| f:\Aero\AEROPS\Backend\app\models\access_code.py              | Python             |          6 |          0 |          4 |         10 |
+| f:\Aero\AEROPS\Backend\app\models\aircraft.py                 | Python             |         45 |          0 |         21 |         66 |
+| f:\Aero\AEROPS\Backend\app\models\engineer.py                 | Python             |         32 |          0 |         13 |         45 |
+| f:\Aero\AEROPS\Backend\app\models\pilot.py                    | Python             |        122 |          0 |         37 |        159 |
+| f:\Aero\AEROPS\Backend\app\models\simulation.py               | Python             |         18 |          0 |         10 |         28 |
+| f:\Aero\AEROPS\Backend\app\models\training.py                 | Python             |         13 |          0 |          5 |         18 |
+| f:\Aero\AEROPS\Backend\app\routes\__init__.py                 | Python             |          0 |          0 |          1 |          1 |
+| f:\Aero\AEROPS\Backend\app\routes\access_code.py              | Python             |         37 |          0 |         10 |         47 |
+| f:\Aero\AEROPS\Backend\app\routes\add.py                      | Python             |         17 |          0 |          5 |         22 |
+| f:\Aero\AEROPS\Backend\app\routes\aircraft.py                 | Python             |        105 |          0 |         24 |        129 |
+| f:\Aero\AEROPS\Backend\app\routes\engineers.py                | Python             |        162 |          0 |         28 |        190 |
+| f:\Aero\AEROPS\Backend\app\routes\pilots.py                   | Python             |        263 |          0 |         21 |        284 |
+| f:\Aero\AEROPS\Backend\app\routes\simulation.py               | Python             |        278 |          0 |         68 |        346 |
+| f:\Aero\AEROPS\Backend\app\routes\training.py                 | Python             |        134 |          0 |         26 |        160 |
+| f:\Aero\AEROPS\Backend\app\schemas\__init__.py                | Python             |          0 |          0 |          1 |          1 |
+| f:\Aero\AEROPS\Backend\app\schemas\access_code.py             | Python             |         15 |          0 |         10 |         25 |
+| f:\Aero\AEROPS\Backend\app\schemas\add.py                     | Python             |          8 |          0 |          3 |         11 |
+| f:\Aero\AEROPS\Backend\app\schemas\aircraft.py                | Python             |         40 |          0 |         16 |         56 |
+| f:\Aero\AEROPS\Backend\app\schemas\engineer.py                | Python             |         31 |          0 |         16 |         47 |
+| f:\Aero\AEROPS\Backend\app\schemas\pilot.py                   | Python             |        112 |          0 |         30 |        142 |
+| f:\Aero\AEROPS\Backend\app\schemas\simulation.py              | Python             |         57 |          0 |         19 |         76 |
+| f:\Aero\AEROPS\Backend\app\schemas\training.py                | Python             |         13 |          0 |          7 |         20 |
+| f:\Aero\AEROPS\Backend\app\seed_data.py                       | Python             |        196 |          0 |         10 |        206 |
+| f:\Aero\AEROPS\Backend\requirements.txt                       | pip requirements   |          4 |          0 |          1 |          5 |
+| f:\Aero\AEROPS\Frontend\README.md                             | Markdown           |          2 |          0 |          2 |          4 |
+| f:\Aero\AEROPS\Frontend\bun.lock                              | JSON with Comments |        667 |          0 |        579 |      1,246 |
+| f:\Aero\AEROPS\Frontend\components.json                       | JSON               |         20 |          0 |          1 |         21 |
+| f:\Aero\AEROPS\Frontend\eslint.config.js                      | JavaScript         |         25 |          0 |          2 |         27 |
+| f:\Aero\AEROPS\Frontend\index.html                            | HTML               |         21 |          2 |          4 |         27 |
+| f:\Aero\AEROPS\Frontend\package-lock.json                     | JSON               |      8,883 |          0 |          1 |      8,884 |
+| f:\Aero\AEROPS\Frontend\package.json                          | JSON               |         96 |          0 |          1 |         97 |
+| f:\Aero\AEROPS\Frontend\playwright-fixture.ts                 | TypeScript         |          1 |          2 |          1 |          4 |
+| f:\Aero\AEROPS\Frontend\playwright.config.ts                  | TypeScript         |          3 |          6 |          2 |         11 |
+| f:\Aero\AEROPS\Frontend\postcss.config.js                     | JavaScript         |          6 |          0 |          1 |          7 |
+| f:\Aero\AEROPS\Frontend\public\mock\aircrafts.json            | JSON               |          9 |          0 |          1 |         10 |
+| f:\Aero\AEROPS\Frontend\public\mock\engineers.json            | JSON               |         14 |          0 |          1 |         15 |
+| f:\Aero\AEROPS\Frontend\public\mock\pilots.json               | JSON               |        190 |          0 |          1 |        191 |
+| f:\Aero\AEROPS\Frontend\public\placeholder.svg                | XML                |         40 |          0 |          1 |         41 |
+| f:\Aero\AEROPS\Frontend\src\App.css                           | PostCSS            |         37 |          0 |          6 |         43 |
+| f:\Aero\AEROPS\Frontend\src\App.tsx                           | TypeScript JSX     |         55 |          0 |          5 |         60 |
+| f:\Aero\AEROPS\Frontend\src\components\BackgroundLayout.tsx   | TypeScript JSX     |         24 |          0 |          3 |         27 |
+| f:\Aero\AEROPS\Frontend\src\components\HumanBodyModel.tsx     | TypeScript JSX     |         79 |          1 |         16 |         96 |
+| f:\Aero\AEROPS\Frontend\src\components\IAFRankInsignia.tsx    | TypeScript JSX     |         52 |          0 |          7 |         59 |
+| f:\Aero\AEROPS\Frontend\src\components\NavLink.tsx            | TypeScript JSX     |         24 |          0 |          5 |         29 |
+| f:\Aero\AEROPS\Frontend\src\components\PageHeader.tsx         | TypeScript JSX     |         26 |          0 |          4 |         30 |
+| f:\Aero\AEROPS\Frontend\src\components\StatusBadge.tsx        | TypeScript JSX     |         50 |          0 |          8 |         58 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\accordion.tsx       | TypeScript JSX     |         45 |          0 |          8 |         53 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\alert-dialog.tsx    | TypeScript JSX     |         91 |          0 |         14 |        105 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\alert.tsx           | TypeScript JSX     |         37 |          0 |          7 |         44 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\aspect-ratio.tsx    | TypeScript JSX     |          3 |          0 |          3 |          6 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\avatar.tsx          | TypeScript JSX     |         33 |          0 |          6 |         39 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\badge.tsx           | TypeScript JSX     |         24 |          0 |          6 |         30 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\breadcrumb.tsx      | TypeScript JSX     |         80 |          0 |         11 |         91 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\button.tsx          | TypeScript JSX     |         42 |          0 |          6 |         48 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\calendar.tsx        | TypeScript JSX     |         50 |          0 |          5 |         55 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\card.tsx            | TypeScript JSX     |         35 |          0 |          9 |         44 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\carousel.tsx        | TypeScript JSX     |        195 |          0 |         30 |        225 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\chart.tsx           | TypeScript JSX     |        270 |          2 |         32 |        304 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\checkbox.tsx        | TypeScript JSX     |         23 |          0 |          4 |         27 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\collapsible.tsx     | TypeScript JSX     |          5 |          0 |          5 |         10 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\command.tsx         | TypeScript JSX     |        115 |          0 |         18 |        133 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\context-menu.tsx    | TypeScript JSX     |        161 |          0 |         18 |        179 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\dialog.tsx          | TypeScript JSX     |         83 |          0 |         13 |         96 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\drawer.tsx          | TypeScript JSX     |         75 |          0 |         13 |         88 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\dropdown-menu.tsx   | TypeScript JSX     |        162 |          0 |         18 |        180 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\form.tsx            | TypeScript JSX     |        105 |          0 |         25 |        130 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\hover-card.tsx      | TypeScript JSX     |         22 |          0 |          6 |         28 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\input-otp.tsx       | TypeScript JSX     |         54 |          0 |          8 |         62 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\input.tsx           | TypeScript JSX     |         19 |          0 |          4 |         23 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\label.tsx           | TypeScript JSX     |         13 |          0 |          5 |         18 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\menubar.tsx         | TypeScript JSX     |        189 |          0 |         19 |        208 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\navigation-menu.tsx | TypeScript JSX     |        109 |          0 |         12 |        121 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\pagination.tsx      | TypeScript JSX     |         71 |          0 |         11 |         82 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\popover.tsx         | TypeScript JSX     |         24 |          0 |          6 |         30 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\progress.tsx        | TypeScript JSX     |         20 |          0 |          4 |         24 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\radio-group.tsx     | TypeScript JSX     |         32 |          0 |          5 |         37 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\resizable.tsx       | TypeScript JSX     |         32 |          0 |          6 |         38 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\scroll-area.tsx     | TypeScript JSX     |         34 |          0 |          5 |         39 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\select.tsx          | TypeScript JSX     |        130 |          0 |         14 |        144 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\separator.tsx       | TypeScript JSX     |         17 |          0 |          4 |         21 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\sheet.tsx           | TypeScript JSX     |         93 |          0 |         15 |        108 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\sidebar.tsx         | TypeScript JSX     |        572 |         12 |         54 |        638 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\skeleton.tsx        | TypeScript JSX     |          5 |          0 |          3 |          8 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\slider.tsx          | TypeScript JSX     |         20 |          0 |          4 |         24 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\sonner.tsx          | TypeScript JSX     |         23 |          0 |          5 |         28 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\switch.tsx          | TypeScript JSX     |         24 |          0 |          4 |         28 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\table.tsx           | TypeScript JSX     |         62 |          0 |         11 |         73 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\tabs.tsx            | TypeScript JSX     |         47 |          0 |          7 |         54 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\textarea.tsx        | TypeScript JSX     |         17 |          0 |          5 |         22 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\toast.tsx           | TypeScript JSX     |         99 |          0 |         13 |        112 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\toaster.tsx         | TypeScript JSX     |         22 |          0 |          3 |         25 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\toggle-group.tsx    | TypeScript JSX     |         41 |          0 |          9 |         50 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\toggle.tsx          | TypeScript JSX     |         32 |          0 |          6 |         38 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\tooltip.tsx         | TypeScript JSX     |         22 |          0 |          7 |         29 |
+| f:\Aero\AEROPS\Frontend\src\components\ui\use-toast.ts        | TypeScript         |          2 |          0 |          2 |          4 |
+| f:\Aero\AEROPS\Frontend\src\hooks\use-mobile.tsx              | TypeScript JSX     |         15 |          0 |          5 |         20 |
+| f:\Aero\AEROPS\Frontend\src\hooks\use-toast.ts                | TypeScript         |        154 |          2 |         31 |        187 |
+| f:\Aero\AEROPS\Frontend\src\index.css                         | PostCSS            |         80 |          1 |         19 |        100 |
+| f:\Aero\AEROPS\Frontend\src\lib\api.ts                        | TypeScript         |        206 |          0 |         21 |        227 |
+| f:\Aero\AEROPS\Frontend\src\lib\utils.ts                      | TypeScript         |          5 |          0 |          2 |          7 |
+| f:\Aero\AEROPS\Frontend\src\main.tsx                          | TypeScript JSX     |          4 |          0 |          2 |          6 |
+| f:\Aero\AEROPS\Frontend\src\pages\AddAircraft.tsx             | TypeScript JSX     |         77 |          0 |          7 |         84 |
+| f:\Aero\AEROPS\Frontend\src\pages\AddEngineer.tsx             | TypeScript JSX     |        118 |          0 |         12 |        130 |
+| f:\Aero\AEROPS\Frontend\src\pages\AddPilot.tsx                | TypeScript JSX     |        296 |          0 |         16 |        312 |
+| f:\Aero\AEROPS\Frontend\src\pages\AircraftDetail.tsx          | TypeScript JSX     |        152 |          0 |         26 |        178 |
+| f:\Aero\AEROPS\Frontend\src\pages\AircraftInfo.tsx            | TypeScript JSX     |         59 |          0 |          8 |         67 |
+| f:\Aero\AEROPS\Frontend\src\pages\EngineerDetail.tsx          | TypeScript JSX     |        176 |          0 |         16 |        192 |
+| f:\Aero\AEROPS\Frontend\src\pages\EngineerInfo.tsx            | TypeScript JSX     |         75 |          0 |          9 |         84 |
+| f:\Aero\AEROPS\Frontend\src\pages\Index.tsx                   | TypeScript JSX     |          9 |          4 |          4 |         17 |
+| f:\Aero\AEROPS\Frontend\src\pages\MainMenu.tsx                | TypeScript JSX     |         83 |          2 |          7 |         92 |
+| f:\Aero\AEROPS\Frontend\src\pages\NotFound.tsx                | TypeScript JSX     |         20 |          0 |          5 |         25 |
+| f:\Aero\AEROPS\Frontend\src\pages\PilotDetail.tsx             | TypeScript JSX     |        218 |          0 |         12 |        230 |
+| f:\Aero\AEROPS\Frontend\src\pages\PilotInfo.tsx               | TypeScript JSX     |         75 |          0 |          9 |         84 |
+| f:\Aero\AEROPS\Frontend\src\pages\PinEntry.tsx                | TypeScript JSX     |        104 |          0 |         12 |        116 |
+| f:\Aero\AEROPS\Frontend\src\pages\Simulation.tsx              | TypeScript JSX     |        631 |          0 |         72 |        703 |
+| f:\Aero\AEROPS\Frontend\src\pages\Training.tsx                | TypeScript JSX     |        219 |          0 |         27 |        246 |
+| f:\Aero\AEROPS\Frontend\src\test\example.test.ts              | TypeScript         |          6 |          0 |          2 |          8 |
+| f:\Aero\AEROPS\Frontend\src\test\setup.ts                     | TypeScript         |         14 |          0 |          2 |         16 |
+| f:\Aero\AEROPS\Frontend\src\types\reactjs-human-body.d.ts     | TypeScript         |         12 |          0 |          4 |         16 |
+| f:\Aero\AEROPS\Frontend\src\vite-env.d.ts                     | TypeScript         |          0 |          1 |          1 |          2 |
+| f:\Aero\AEROPS\Frontend\tailwind.config.ts                    | TypeScript         |         90 |          0 |          2 |         92 |
+| f:\Aero\AEROPS\Frontend\tsconfig.app.json                     | JSON               |         35 |          0 |          0 |         35 |
+| f:\Aero\AEROPS\Frontend\tsconfig.json                         | JSON with Comments |         24 |          0 |          0 |         24 |
+| f:\Aero\AEROPS\Frontend\tsconfig.node.json                    | JSON               |         18 |          2 |          3 |         23 |
+| f:\Aero\AEROPS\Frontend\vite.config.ts                        | TypeScript         |         26 |          1 |          2 |         29 |
+| f:\Aero\AEROPS\Frontend\vitest.config.ts                      | TypeScript         |         15 |          0 |          2 |         17 |
+| f:\Aero\AEROPS\sim_logic\App.css                              | PostCSS            |        370 |          0 |         69 |        439 |
+| f:\Aero\AEROPS\sim_logic\App.jsx                              | JavaScript JSX     |        491 |          0 |         75 |        566 |
+| f:\Aero\AEROPS\sim_logic\assets\react.svg                     | XML                |          1 |          0 |          0 |          1 |
+| f:\Aero\AEROPS\sim_logic\assets\vite.svg                      | XML                |          1 |          0 |          1 |          2 |
+| f:\Aero\AEROPS\sim_logic\components\ControlPanel.jsx          | JavaScript JSX     |        274 |          0 |         22 |        296 |
+| f:\Aero\AEROPS\sim_logic\components\MapView.jsx               | JavaScript JSX     |        156 |          0 |         21 |        177 |
+| f:\Aero\AEROPS\sim_logic\components\MissionTimeline.jsx       | JavaScript JSX     |         26 |          0 |          3 |         29 |
+| f:\Aero\AEROPS\sim_logic\components\ResultPanel.jsx           | JavaScript JSX     |        113 |          0 |          8 |        121 |
+| f:\Aero\AEROPS\sim_logic\data\airspaces.json                  | JSON               |         35 |          0 |          1 |         36 |
+| f:\Aero\AEROPS\sim_logic\data\equipment.json                  | JSON               |         42 |          0 |          1 |         43 |
+| f:\Aero\AEROPS\sim_logic\data\targets.json                    | JSON               |         23 |          0 |          1 |         24 |
+| f:\Aero\AEROPS\sim_logic\data\team.json                       | JSON               |         74 |          0 |          1 |         75 |
+| f:\Aero\AEROPS\sim_logic\index.css                            | PostCSS            |         30 |          0 |          4 |         34 |
+| f:\Aero\AEROPS\sim_logic\main.jsx                             | JavaScript JSX     |         10 |          0 |          2 |         12 |
+| f:\Aero\AEROPS\sim_logic\utils\simulation.js                  | JavaScript         |        607 |          0 |        118 |        725 |
+| Total                                                         |                    |     21,353 |         38 |      2,244 |     23,635 |
++---------------------------------------------------------------+--------------------+------------+------------+------------+------------+
