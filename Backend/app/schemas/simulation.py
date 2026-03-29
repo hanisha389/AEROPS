@@ -50,6 +50,62 @@ class SimulationRunRequest(BaseModel):
     weaponLoadout: list[WeaponLoadoutItem] = Field(default_factory=list)
 
 
+class SimulationTimelineStep(BaseModel):
+    timeSeconds: float
+    aircraftPosition: Coordinate
+    enemyPosition: Coordinate
+    fuelRemaining: float
+    distanceToTarget: float
+    aircraftSpeedKmh: float
+    targetSpeedKmh: float
+    status: Literal["searching", "locked", "intercepted", "failed"]
+    statusFlags: list[str] = Field(default_factory=list)
+
+
+class SimulationEvent(BaseModel):
+    timeSeconds: float
+    description: str
+
+
+class SimulationTrajectoryMetrics(BaseModel):
+    totalDistanceKm: float
+    pathDeviationKm: float
+    interceptPoint: Coordinate
+    interceptTimeSeconds: float | None
+
+
+class SimulationFuelMetrics(BaseModel):
+    fuelConsumptionRatePerHour: float
+    remainingRangeKm: float
+    returnFeasibility: float
+
+
+class SimulationThreatMetrics(BaseModel):
+    timeInEnemyAirspaceSeconds: float
+    exposurePercentage: float
+    enemyStrengthImpact: float
+
+
+class SimulationPerformanceMetrics(BaseModel):
+    pilotEfficiency: float
+    weaponReadiness: float
+
+
+class SimulationMetrics(BaseModel):
+    trajectory: SimulationTrajectoryMetrics
+    fuel: SimulationFuelMetrics
+    threat: SimulationThreatMetrics
+    performance: SimulationPerformanceMetrics
+
+
+class SimulationFinalResult(BaseModel):
+    status: Literal["Active", "Success", "Failed"]
+    interceptTimeSeconds: float | None
+    successRatePercent: float
+    timeElapsedSeconds: float
+    fuelRemaining: float
+
+
 class SimulationPilotContext(BaseModel):
     id: int
     name: str
@@ -73,3 +129,7 @@ class SimulationRunResponse(BaseModel):
     selectedPilots: list[SimulationPilotContext]
     aircraftUsed: list[str]
     weaponLoadout: list[WeaponLoadoutItem]
+    timeline: list[SimulationTimelineStep]
+    finalResult: SimulationFinalResult
+    metrics: SimulationMetrics
+    eventLog: list[SimulationEvent]

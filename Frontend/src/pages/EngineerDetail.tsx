@@ -27,14 +27,11 @@ interface Engineer {
 }
 
 const EngineerDetail = () => {
-  const taskTypeOptions = ["Assigned", "Inspection", "Repair", "Diagnostics", "Calibration"];
   const componentOptions = ["engine", "wings", "avionics", "fuel", "landingGear"];
-  const severityOptions = ["Warning", "Critical"];
   const { id } = useParams();
   const [engineer, setEngineer] = useState<Engineer | null>(null);
   const [issues, setIssues] = useState<OpenIssue[]>([]);
-  const [aircraftOptions, setAircraftOptions] = useState<{ id: string }[]>([]);
-  const [task, setTask] = useState({ aircraft: "", type: "Assigned", component: "engine", severity: "Warning", isCurrent: true, issueId: "" });
+  const [task, setTask] = useState({ aircraft: "", type: "Repair", component: "engine", isCurrent: true, issueId: "" });
 
   const sortedLogs = useMemo(() => {
     if (!engineer) return [];
@@ -45,13 +42,13 @@ const EngineerDetail = () => {
     if (!engineer) return;
     const updated = await api.updateEngineerLogStatus(engineer.id, logId, completionStatus);
     setEngineer(updated);
+    api.getOpenIssues().then(setIssues);
   };
 
   useEffect(() => {
     if (!id) return;
     api.getEngineerById(Number(id)).then(setEngineer);
     api.getOpenIssues().then(setIssues);
-    api.getAircrafts().then((items) => setAircraftOptions(items.map((item: { id: string }) => ({ id: item.id }))));
   }, [id]);
 
   const assignIssue = (issueId: number) => {
@@ -59,9 +56,8 @@ const EngineerDetail = () => {
     if (!issue) return;
     setTask({
       aircraft: issue.aircraftId,
-      type: "Assigned",
+      type: "Repair",
       component: issue.component,
-      severity: issue.severity,
       isCurrent: true,
       issueId: String(issue.id),
     });
@@ -70,12 +66,16 @@ const EngineerDetail = () => {
   const handleAssign = async (event: FormEvent) => {
     event.preventDefault();
     if (!engineer) return;
+    if (!task.issueId) {
+      window.alert("Select an aircraft issue before assigning work.");
+      return;
+    }
 
     const date = new Date().toISOString().slice(0, 10);
     const updated = await api.addEngineerLog(engineer.id, {
       aircraft: task.aircraft,
       type: task.type,
-      description: `${task.component} ${task.severity} - requires ${task.type.toLowerCase()}`,
+      description: `${task.component} issue - assigned for ${task.type.toLowerCase()}`,
       isCurrent: task.isCurrent,
       issueId: task.issueId ? Number(task.issueId) : undefined,
       date,
@@ -83,7 +83,7 @@ const EngineerDetail = () => {
     setEngineer(updated);
     api.getOpenIssues().then(setIssues);
 
-    setTask({ aircraft: "", type: "Assigned", component: "engine", severity: "Warning", isCurrent: true, issueId: "" });
+    setTask({ aircraft: "", type: "Repair", component: "engine", isCurrent: true, issueId: "" });
   };
 
   if (!engineer) {
@@ -132,25 +132,15 @@ const EngineerDetail = () => {
               </select>
             )}
             <form onSubmit={handleAssign} className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <select className="border border-border bg-background/40 px-3 py-2" value={task.aircraft} onChange={(e) => setTask({ ...task, aircraft: e.target.value })}>
-                <option value="">Select Aircraft</option>
-                {Array.from(new Set([...issues.map((item) => item.aircraftId), ...aircraftOptions.map((item) => item.id)])).map((aircraftId) => (
-                  <option key={aircraftId} value={aircraftId}>{aircraftId}</option>
-                ))}
-              </select>
-              <select className="border border-border bg-background/40 px-3 py-2" value={task.type} onChange={(e) => setTask({ ...task, type: e.target.value })} required>
-                {taskTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
               <select className="border border-border bg-background/40 px-3 py-2" value={task.component} onChange={(e) => setTask({ ...task, component: e.target.value })}>
                 {componentOptions.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
-              <select className="border border-border bg-background/40 px-3 py-2" value={task.severity} onChange={(e) => setTask({ ...task, severity: e.target.value })}>
-                {severityOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground md:col-span-2">
-                <input type="checkbox" checked={task.isCurrent} onChange={(e) => setTask({ ...task, isCurrent: e.target.checked })} />
-                Mark as current assignment
-              </label>
+              <p className="border border-border bg-background/20 px-3 py-2 font-rajdhani text-sm text-muted-foreground">
+                Aircraft: <span className="text-primary">{task.aircraft || "Select issue first"}</span>
+              </p>
+              <p className="border border-border bg-background/20 px-3 py-2 font-rajdhani text-sm text-muted-foreground md:col-span-2">
+                Workflow: Select issue, assign to engineer, mark complete in maintenance log.
+              </p>
               <button type="submit" className="border border-primary px-3 py-2 font-orbitron text-xs text-primary md:col-span-2">ASSIGN</button>
             </form>
           </div>
@@ -175,7 +165,7 @@ const EngineerDetail = () => {
                     >
                       <option value="Pending">Pending</option>
                       <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
+                      <option value="COMPLETE">COMPLETE</option>
                     </select>
                   </div>
                 </div>

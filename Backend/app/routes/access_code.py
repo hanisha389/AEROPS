@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.dependencies.db import get_db
+from app.dependencies.roles import ROLE_ADMIN_COMMANDER, require_roles
 from app.models.access_code import AccessCode
 from app.schemas.access_code import (
     AccessCodeRead,
@@ -9,7 +10,7 @@ from app.schemas.access_code import (
     AccessCodeVerifyResult,
 )
 
-router = APIRouter(prefix="/pin", tags=["pin"])
+router = APIRouter(prefix="/pin", tags=["pin"], dependencies=[Depends(require_roles(ROLE_ADMIN_COMMANDER))])
 
 
 def _get_or_create_access_code(db: Session) -> AccessCode:

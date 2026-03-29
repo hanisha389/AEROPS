@@ -3,20 +3,14 @@ import { Circle, CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMa
 import BackgroundLayout from "@/components/BackgroundLayout";
 import PageHeader from "@/components/PageHeader";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   api,
   type AirspaceZone,
   type MapCoordinate,
   type EnemyAircraftUnitPayload,
-  type SimulationResult,
+  type SimulationRunResponse,
 } from "@/lib/api";
 import "leaflet/dist/leaflet.css";
+import { useNavigate } from "react-router-dom";
 
 type SidebarMode = "airspace" | "target" | "team" | "simulation";
 type MapMode = "idle" | "set_base" | "airspace" | "route_start" | "route_waypoint" | "route_end" | "ground_target" | "aircraft_waypoint";
@@ -98,8 +92,7 @@ const Simulation = () => {
   const [weaponByAircraft, setWeaponByAircraft] = useState<Record<string, Record<string, number>>>({});
 
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<SimulationResult | null>(null);
-  const [isResultOpen, setIsResultOpen] = useState(false);
+  const navigate = useNavigate();
 
   const routeCoordinates = useMemo(() => {
     if (!routeStart || !routeEnd) {
@@ -183,7 +176,6 @@ const Simulation = () => {
     if (mapMode === "set_base") {
       api.setSimulationBase(point).then(setBaseLocation);
       setMapMode("idle");
-      setResult(null);
       return;
     }
     if (mapMode === "airspace") {
@@ -194,27 +186,22 @@ const Simulation = () => {
       setRouteStart(point);
       setRouteWaypoints([]);
       setRouteEnd(null);
-      setResult(null);
       return;
     }
     if (mapMode === "route_waypoint") {
       setRouteWaypoints((prev) => [...prev, point]);
-      setResult(null);
       return;
     }
     if (mapMode === "route_end") {
       setRouteEnd(point);
-      setResult(null);
       return;
     }
     if (mapMode === "ground_target") {
       setGroundTargetLocation(point);
-      setResult(null);
       return;
     }
     if (mapMode === "aircraft_waypoint") {
       setAircraftRouteWaypoints((prev) => [...prev, point]);
-      setResult(null);
     }
   };
 
@@ -243,7 +230,6 @@ const Simulation = () => {
     setSelectedPilotIds((prev) =>
       prev.includes(pilotId) ? prev.filter((id) => id !== pilotId) : [...prev, pilotId],
     );
-    setResult(null);
   };
 
   const setEnemyAircraftCount = (aircraftType: string, quantity: number) => {
@@ -251,7 +237,6 @@ const Simulation = () => {
       ...prev,
       [aircraftType]: Math.max(0, Math.min(20, quantity)),
     }));
-    setResult(null);
   };
 
   const setWeaponQuantity = (aircraftId: string, weaponType: string, quantity: number) => {
@@ -310,8 +295,7 @@ const Simulation = () => {
         selectedPilotIds,
         weaponLoadout,
       });
-      setResult(output);
-      setIsResultOpen(true);
+      navigate("/simulation/run", { state: { simulation: output } });
     } finally {
       setRunning(false);
     }
@@ -410,19 +394,6 @@ const Simulation = () => {
               <Polyline positions={toPositions(previewAircraftPath)} pathOptions={{ color: "#22d3ee", weight: 2, dashArray: "3 7" }} />
             )}
 
-            {result?.bestAircraftPath && result.bestAircraftPath.length > 1 && (
-              <Polyline positions={toPositions(result.bestAircraftPath)} pathOptions={{ color: "#38bdf8", weight: 4 }} />
-            )}
-
-            {result?.interceptLocation && (
-              <CircleMarker
-                center={[result.interceptLocation.lat, result.interceptLocation.lng]}
-                radius={9}
-                pathOptions={{ color: "#facc15", fillColor: "#facc15", fillOpacity: 1 }}
-              >
-                <Tooltip>Intercept Point</Tooltip>
-              </CircleMarker>
-            )}
           </MapContainer>
         </div>
 
@@ -637,64 +608,8 @@ const Simulation = () => {
             </div>
           )}
 
-          {result && <p className="font-rajdhani text-xs text-muted-foreground">Last run: {result.timeToInterceptMinutes} min to intercept, popup has full mission report.</p>}
         </div>
       </div>
-
-      <Dialog open={isResultOpen} onOpenChange={setIsResultOpen}>
-        <DialogContent className="max-w-5xl border-border/40 bg-card/95">
-          <DialogHeader>
-            <DialogTitle className="font-orbitron text-sm tracking-[0.15em] text-primary">SIMULATION MISSION OUTPUT</DialogTitle>
-            <DialogDescription className="font-rajdhani text-xs text-muted-foreground">Visual intercept strategy and deterministic mission evaluation.</DialogDescription>
-          </DialogHeader>
-
-          {result && (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
-              <div className="border border-border/40 bg-background/20 p-2">
-                <MapContainer center={[result.interceptLocation.lat, result.interceptLocation.lng]} zoom={5} minZoom={2} className="h-[22rem] w-full">
-                  <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-
-                  {result.enemyRoute.length > 1 && (
-                    <Polyline positions={toPositions(result.enemyRoute)} pathOptions={{ color: "#f87171", weight: 3, dashArray: "6 8" }} />
-                  )}
-
-                  {result.bestAircraftPath.length > 1 && (
-                    <Polyline positions={toPositions(result.bestAircraftPath)} pathOptions={{ color: "#38bdf8", weight: 4 }} />
-                  )}
-
-                  <CircleMarker center={[result.interceptLocation.lat, result.interceptLocation.lng]} radius={9} pathOptions={{ color: "#facc15", fillColor: "#facc15", fillOpacity: 1 }}>
-                    <Tooltip>Intercept Point</Tooltip>
-                  </CircleMarker>
-                </MapContainer>
-              </div>
-
-              <div className="space-y-2 border border-border/40 bg-background/20 p-3">
-                <p className="font-orbitron text-xs tracking-[0.12em] text-primary">TEXT OUTPUT</p>
-                <p className="font-rajdhani text-sm text-muted-foreground">Best Time to Attack: {result.timeToInterceptMinutes} min</p>
-                <p className="font-rajdhani text-sm text-muted-foreground">Intercept Location: {formatCoord(result.interceptLocation)}</p>
-                <p className="font-rajdhani text-xs text-muted-foreground">Reasoning: shortest route to a timing-feasible intercept computed from base origin and target movement profile.</p>
-                <p className="font-rajdhani text-xs text-muted-foreground">Engine Note: {result.explanation}</p>
-
-                <div className="mt-2 border border-border/30 p-2">
-                  <p className="font-orbitron text-[10px] tracking-[0.12em] text-primary">MISSION METRICS</p>
-                  <p className="font-rajdhani text-xs text-muted-foreground">Success Probability: {result.successProbability.toFixed(2)}%</p>
-                  <p className="font-rajdhani text-xs text-muted-foreground">Risk Level: {result.riskLevel.toFixed(2)}%</p>
-                  <p className="font-rajdhani text-xs text-muted-foreground">Fuel Feasibility: {result.fuelFeasibility.toFixed(2)}%</p>
-                  <p className="font-rajdhani text-xs text-muted-foreground">Threat Level: {result.threatLevel.toFixed(2)}%</p>
-                  <p className="font-rajdhani text-xs text-muted-foreground">Mission Efficiency Score: {result.missionEfficiencyScore.toFixed(2)}%</p>
-                </div>
-
-                <div className="border border-border/30 p-2">
-                  <p className="font-orbitron text-[10px] tracking-[0.12em] text-primary">MISSION CONTEXT</p>
-                  <p className="font-rajdhani text-xs text-muted-foreground">Pilots: {result.selectedPilots.map((pilot) => `${pilot.callSign} (${pilot.aircraftId || "Unassigned"})`).join(", ")}</p>
-                  <p className="font-rajdhani text-xs text-muted-foreground">Aircraft: {result.aircraftUsed.join(", ")}</p>
-                  <p className="font-rajdhani text-xs text-muted-foreground">Weapon Loadout: {result.weaponLoadout.length === 0 ? "None" : result.weaponLoadout.map((item) => `${item.aircraftId}:${item.weaponType} x${item.quantity}`).join(" | ")}</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </BackgroundLayout>
   );
 };

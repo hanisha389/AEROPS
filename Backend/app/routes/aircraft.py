@@ -1,7 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.dependencies.db import get_db
+from app.dependencies.roles import (
+    ROLE_ADMIN_COMMANDER,
+    ROLE_ENGINEER,
+    ROLE_PILOT,
+    RequestContext,
+    get_request_context,
+)
 from app.models.aircraft import Aircraft, AircraftMission, AircraftPilotAssignment, AircraftComponentStatus, AircraftIssue
+from app.models.maintenance import AircraftMaintenanceLog
+from app.models.pilot import Pilot
 from app.schemas.aircraft import AircraftCreate, AircraftRead, AircraftUpdate
 
 router = APIRouter(prefix="/aircraft", tags=["aircraft"])
@@ -48,21 +57,98 @@ def _to_schema(aircraft: Aircraft) -> AircraftRead:
 
 
 @router.get("", response_model=list[AircraftRead])
-def list_aircraft(db: Session = Depends(get_db)):
+def list_aircraft(db: Session = Depends(get_db), context: RequestContext = Depends(get_request_context)):
+    if context.role not in {ROLE_ADMIN_COMMANDER, ROLE_ENGINEER, ROLE_PILOT}:
+        raise HTTPException(status_code=403, detail="Role is not allowed to access aircraft data")
+
+    if context.role == ROLE_PILOT:
+        if context.pilot_id is None:
+            return []
+        pilot = db.query(Pilot).filter(Pilot.id == context.pilot_id).first()
+        if not pilot or not pilot.assigned_aircraft:
+            return []
+        aircraft = db.query(Aircraft).filter(Aircraft.id == pilot.assigned_aircraft).all()
+        return [_to_schema(item) for item in aircraft]
+
     aircraft = db.query(Aircraft).all()
     return [_to_schema(item) for item in aircraft]
 
 
 @router.get("/{aircraft_id}", response_model=AircraftRead)
-def get_aircraft(aircraft_id: str, db: Session = Depends(get_db)):
+def get_aircraft(aircraft_id: str, db: Session = Depends(get_db), context: RequestContext = Depends(get_request_context)):
+    if context.role not in {ROLE_ADMIN_COMMANDER, ROLE_ENGINEER, ROLE_PILOT}:
+        raise HTTPException(status_code=403, detail="Role is not allowed to access aircraft data")
+
+    if context.role == ROLE_PILOT:
+        if context.pilot_id is None:
+            raise HTTPException(status_code=403, detail="Pilot role requires x-pilot-id header")
+        pilot = db.query(Pilot).filter(Pilot.id == context.pilot_id).first()
+        if not pilot or pilot.assigned_aircraft != aircraft_id:
+            raise HTTPException(status_code=403, detail="Pilot can only access assigned aircraft")
+
     aircraft = db.query(Aircraft).filter(Aircraft.id == aircraft_id).first()
     if not aircraft:
         raise HTTPException(status_code=404, detail="Aircraft not found")
     return _to_schema(aircraft)
 
 
+@router.get("/{aircraft_id}/maintenance-history")
+def get_aircraft_maintenance_history(
+    aircraft_id: str,
+    db: Session = Depends(get_db),
+    context: RequestContext = Depends(get_request_context),
+):
+    if context.role not in {ROLE_ADMIN_COMMANDER, ROLE_ENGINEER, ROLE_PILOT}:
+        raise HTTPException(status_code=403, detail="Role is not allowed to access aircraft data")
+
+    if context.role == ROLE_PILOT:
+        if context.pilot_id is None:
+            raise HTTPException(status_code=403, detail="Pilot role requires x-pilot-id header")
+        pilot = db.query(Pilot).filter(Pilot.id == context.pilot_id).first()
+        if not pilot or pilot.assigned_aircraft != aircraft_id:
+            raise HTTPException(status_code=403, detail="Pilot can only access assigned aircraft")
+
+    aircraft = db.query(Aircraft).filter(Aircraft.id == aircraft_id).first()
+    if not aircraft:
+        raise HTTPException(status_code=404, detail="Aircraft not found")
+
+    allowed_log_types = [
+        "PRE_FLIGHT_INSPECTION",
+        "POST_FLIGHT_INSPECTION",
+        "ENGINEER_TASK_COMPLETION",
+        "MAINTENANCE_COMPLETION",
+    ]
+    rows = (
+        db.query(AircraftMaintenanceLog)
+        .filter(
+            AircraftMaintenanceLog.aircraft_id == aircraft_id,
+            AircraftMaintenanceLog.log_type.in_(allowed_log_types),
+        )
+        .order_by(AircraftMaintenanceLog.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": row.id,
+            "aircraftId": row.aircraft_id,
+            "logType": row.log_type,
+            "summary": row.summary or "",
+            "createdAt": row.created_at,
+            "documentId": row.document_id,
+        }
+        for row in rows
+    ]
+
+
 @router.post("", response_model=AircraftRead, status_code=status.HTTP_201_CREATED)
-def create_aircraft(payload: AircraftCreate, db: Session = Depends(get_db)):
+def create_aircraft(
+    payload: AircraftCreate,
+    db: Session = Depends(get_db),
+    context: RequestContext = Depends(get_request_context),
+):
+    if context.role != ROLE_ADMIN_COMMANDER:
+        raise HTTPException(status_code=403, detail="Only admin/commander can create aircraft")
+
     existing = db.query(Aircraft).filter(Aircraft.id == payload.id).first()
     if existing:
         raise HTTPException(status_code=409, detail="Aircraft ID already exists")
@@ -92,7 +178,15 @@ def create_aircraft(payload: AircraftCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{aircraft_id}", response_model=AircraftRead)
-def update_aircraft(aircraft_id: str, payload: AircraftUpdate, db: Session = Depends(get_db)):
+def update_aircraft(
+    aircraft_id: str,
+    payload: AircraftUpdate,
+    db: Session = Depends(get_db),
+    context: RequestContext = Depends(get_request_context),
+):
+    if context.role not in {ROLE_ADMIN_COMMANDER, ROLE_ENGINEER}:
+        raise HTTPException(status_code=403, detail="Role is not allowed to update aircraft data")
+
     aircraft = db.query(Aircraft).filter(Aircraft.id == aircraft_id).first()
     if not aircraft:
         raise HTTPException(status_code=404, detail="Aircraft not found")

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import BackgroundLayout from '@/components/BackgroundLayout';
-import { Shield, Wrench, Plane, GraduationCap, MonitorPlay } from 'lucide-react';
+import { getCurrentRole, canAccessRoute, ROLE_LABELS } from '@/lib/rbac';
+import { Shield, Wrench, Plane, GraduationCap, MonitorPlay, FileText } from 'lucide-react';
 
 const menuItems = [
   { label: 'PILOT INFO', path: '/pilots', icon: Shield },
@@ -10,11 +11,18 @@ const menuItems = [
   { label: 'AIRCRAFT INFO', path: '/aircraft', icon: Plane },
   { label: 'TRAINING', path: '/training', icon: GraduationCap },
   { label: 'SIMULATION', path: '/simulation', icon: MonitorPlay },
+  { label: 'DOCUMENTS', path: '/documents', icon: FileText },
 ];
 
 const MainMenu = () => {
   const [hovered, setHovered] = useState<number | null>(null);
+  const role = getCurrentRole();
   const navigate = useNavigate();
+
+  const visibleItems = useMemo(
+    () => menuItems.filter((item) => canAccessRoute(item.path, role)),
+    [role],
+  );
 
   return (
     <BackgroundLayout>
@@ -38,8 +46,12 @@ const MainMenu = () => {
             MAIN MENU
           </motion.p>
 
+          <p className="mb-4 font-rajdhani text-[0.65rem] tracking-[0.18em] text-muted-foreground">
+            ACCESS PROFILE: {ROLE_LABELS[role]}
+          </p>
+
           <nav className="flex flex-col gap-1">
-            {menuItems.map((item, i) => {
+            {visibleItems.map((item, i) => {
               const Icon = item.icon;
               return (
                 <motion.button

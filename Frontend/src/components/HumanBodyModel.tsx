@@ -3,6 +3,8 @@ import { BodyComponent } from "reactjs-human-body";
 
 interface HumanBodyModelProps {
   onPartClick?: (part: string) => void;
+  selectedParts?: string[];
+  readOnly?: boolean;
 }
 
 interface BodyModelErrorBoundaryState {
@@ -29,21 +31,21 @@ class BodyModelErrorBoundary extends Component<{ children: ReactNode }, BodyMode
   }
 }
 
-const partsInput = {
-  head: { show: true, selected: true },
-  leftShoulder: { show: true },
-  rightShoulder: { show: true },
-  leftArm: { show: true },
-  rightArm: { show: true, selected: true },
-  chest: { show: true, selected: true },
-  stomach: { show: true },
-  leftLeg: { show: true },
-  rightLeg: { show: true },
-  leftHand: { show: true, selected: true },
-  rightHand: { show: true },
-  leftFoot: { show: true },
-  rightFoot: { show: true },
-};
+const bodyParts = [
+  "head",
+  "leftShoulder",
+  "rightShoulder",
+  "leftArm",
+  "rightArm",
+  "chest",
+  "stomach",
+  "leftLeg",
+  "rightLeg",
+  "leftHand",
+  "rightHand",
+  "leftFoot",
+  "rightFoot",
+] as const;
 
 const FallbackBodyModel = () => {
   return (
@@ -74,7 +76,13 @@ const FallbackBodyModel = () => {
   );
 };
 
-const HumanBodyModel = ({ onPartClick }: HumanBodyModelProps) => {
+const HumanBodyModel = ({ onPartClick, selectedParts = [], readOnly = false }: HumanBodyModelProps) => {
+  const selected = new Set(selectedParts);
+  const partsInput = bodyParts.reduce((acc, part) => {
+    acc[part] = { show: true, selected: selected.has(part) };
+    return acc;
+  }, {} as Record<(typeof bodyParts)[number], { show: boolean; selected: boolean }>);
+
   const SafeBodyComponent = BodyComponent as unknown as
     | ((props: { partsInput: typeof partsInput; onClick?: (part: string) => void }) => JSX.Element)
     | undefined;
@@ -87,7 +95,7 @@ const HumanBodyModel = ({ onPartClick }: HumanBodyModelProps) => {
     <BodyModelErrorBoundary>
       <div className="human-body-panel mx-auto w-full max-w-[18rem] scale-[0.95] origin-top -mt-8 sm:-mt-10">
         <style>{`.human-body-panel svg.selected path { fill: #ef4444 !important; }`}</style>
-        <SafeBodyComponent partsInput={partsInput} onClick={(part) => onPartClick?.(String(part))} />
+        <SafeBodyComponent partsInput={partsInput} onClick={readOnly ? undefined : (part) => onPartClick?.(String(part))} />
       </div>
     </BodyModelErrorBoundary>
   );

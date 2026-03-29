@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 
 const AddPilot = () => {
   const rankOptions = ["Lieutenant", "Captain", "Major", "Wing Commander"];
-  const statusOptions = ["Active", "On Leave", "Grounded", "Training"];
+  const statusOptions = ["ACTIVE", "INACTIVE", "ON LEAVE", "MEDICAL HOLD"];
   const trainingLevelOptions = ["Rookie", "Intermediate", "Expert"];
   const specializationOptions = ["Air Combat", "Ground Strike", "Reconnaissance"];
   const [unlocked, setUnlocked] = useState(false);
@@ -17,7 +17,7 @@ const AddPilot = () => {
     rank: "",
     callSign: "",
     assignedAircraft: "",
-    status: "Active",
+    status: "ACTIVE",
     onHoliday: false,
     serviceNumber: "",
     dateOfBirth: "",
@@ -100,6 +100,7 @@ const AddPilot = () => {
         callSign: form.callSign,
         assignedAircraft: form.assignedAircraft,
         status: form.status,
+        skillLevel: form.trainingLevel,
         onHoliday: form.onHoliday,
         image: form.image,
         personalDetails: {
@@ -168,7 +169,7 @@ const AddPilot = () => {
         rank: "",
         callSign: "",
         assignedAircraft: "",
-        status: "Active",
+        status: "ACTIVE",
         onHoliday: false,
         serviceNumber: "",
         dateOfBirth: "",

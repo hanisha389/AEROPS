@@ -1,8 +1,11 @@
+import hashlib
 import math
+import random
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.dependencies.db import get_db
+from app.dependencies.roles import ROLE_ADMIN_COMMANDER, require_roles
 from app.models.aircraft import Aircraft
 from app.models.pilot import Pilot
 from app.models.simulation import AirspaceZone, AirspaceZoneMeta, SimulationBaseLocation
@@ -11,12 +14,24 @@ from app.schemas.simulation import (
     AirspaceZoneRead,
     Coordinate,
     SimulationBasePayload,
+    SimulationEvent,
+    SimulationFinalResult,
+    SimulationFuelMetrics,
+    SimulationMetrics,
+    SimulationPerformanceMetrics,
     SimulationPilotContext,
     SimulationRunRequest,
     SimulationRunResponse,
+    SimulationThreatMetrics,
+    SimulationTimelineStep,
+    SimulationTrajectoryMetrics,
 )
 
-router = APIRouter(prefix="/simulation", tags=["simulation"])
+router = APIRouter(
+    prefix="/simulation",
+    tags=["simulation"],
+    dependencies=[Depends(require_roles(ROLE_ADMIN_COMMANDER))],
+)
 
 TARGET_SPEED_KMH = {
     "cargo_ship": 37.0,
@@ -30,6 +45,13 @@ MISSION_DIFFICULTY = {
     "air": 0.68,
     "ground": 0.62,
 }
+
+TIMELINE_STEP_SECONDS = 2.0
+SIMULATION_VARIANTS = 10
+INTERCEPT_THRESHOLD_KM = 0.35
+DETECTION_RANGE_KM = 28.0
+REACTION_DELAY_RANGE = (3.0, 10.0)
+DETECTION_DELAY_RANGE = (2.0, 12.0)
 
 
 def _aircraft_speed_kmh(model: str) -> float:
@@ -158,6 +180,182 @@ def _target_speed(payload: SimulationRunRequest) -> float:
     return 0.0
 
 
+def _build_distance_map(points: list[Coordinate]) -> list[tuple[Coordinate, float]]:
+    if not points:
+        return []
+    result: list[tuple[Coordinate, float]] = [(points[0], 0.0)]
+    cumulative = 0.0
+    for index in range(1, len(points)):
+        prev = points[index - 1]
+        current = points[index]
+        segment = _haversine_km(prev, current)
+        cumulative += segment
+        result.append((current, cumulative))
+    return result
+
+
+def _position_along_path(distance_map: list[tuple[Coordinate, float]], distance: float) -> Coordinate:
+    if not distance_map:
+        raise HTTPException(status_code=400, detail="Simulation path is not defined")
+    if distance <= 0.0 or len(distance_map) == 1:
+        return distance_map[0][0]
+
+    for index in range(1, len(distance_map)):
+        start_coord, start_distance = distance_map[index - 1]
+        end_coord, end_distance = distance_map[index]
+        if distance <= end_distance or index == len(distance_map) - 1:
+            segment_delta = end_distance - start_distance
+            ratio = 0.0
+            if segment_delta > 0:
+                ratio = (distance - start_distance) / segment_delta
+            return _interpolate(start_coord, end_coord, min(1.0, max(0.0, ratio)))
+    return distance_map[-1][0]
+
+
+def _seed_from_payload(payload: SimulationRunRequest) -> int:
+    pilot_segment = ",".join(str(pilot_id) for pilot_id in sorted(payload.selectedPilotIds))
+    enemy_segment = ",".join(f"{unit.aircraftType}:{unit.quantity}" for unit in payload.enemyAircraftUnits)
+    weapon_segment = ",".join(f"{item.aircraftId}:{item.weaponType}:{item.quantity}" for item in payload.weaponLoadout)
+    source = f"{payload.missionType}-{payload.groundAirDefenseLevel}-{payload.groundDefenseCount}-{pilot_segment}-{enemy_segment}-{weapon_segment}"
+    digest = hashlib.sha256(source.encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "little")
+
+
+def _inside_enemy_zone(position: Coordinate, enemy_zones: list[AirspaceZone]) -> bool:
+    for zone in enemy_zones:
+        center = Coordinate(lat=zone.center_lat, lng=zone.center_lng)
+        if _haversine_km(position, center) <= zone.radius_km:
+            return True
+    return False
+
+
+def _simulate_timeline(
+    aircraft_map: list[tuple[Coordinate, float]],
+    path_distance: float,
+    enemy_map: list[tuple[Coordinate, float]],
+    enemy_distance: float,
+    aircraft_speed: float,
+    target_speed: float,
+    reaction_delay: float,
+    detection_delay: float,
+    step_seconds: float,
+    max_time_seconds: float,
+    aircraft_range: float,
+    enemy_zones: list[AirspaceZone],
+    record_timeline: bool,
+    record_events: bool,
+) -> dict:
+    timeline: list[SimulationTimelineStep] = []
+    events: list[SimulationEvent] = []
+    time_seconds = 0.0
+    fuel_remaining = 100.0
+    last_aircraft_distance = 0.0
+    locked = False
+    intercepted = False
+    intercept_time: float | None = None
+    time_in_enemy_airspace = 0.0
+    departed_logged = False
+    enemy_zone_logged = False
+    detection_logged = False
+    fuel_failure_logged = False
+    timeout_logged = False
+
+    while time_seconds <= max_time_seconds:
+        enemy_progress = min(enemy_distance, (target_speed * time_seconds) / 3600.0)
+        enemy_pos = _position_along_path(enemy_map, enemy_progress)
+        aircraft_progress_time = max(0.0, time_seconds - reaction_delay)
+        aircraft_progress_distance = min(path_distance, (aircraft_speed * aircraft_progress_time) / 3600.0)
+        aircraft_pos = _position_along_path(aircraft_map, aircraft_progress_distance)
+        distance_to_enemy = _haversine_km(aircraft_pos, enemy_pos)
+
+        inside_enemy = _inside_enemy_zone(aircraft_pos, enemy_zones)
+        if inside_enemy:
+            time_in_enemy_airspace += step_seconds
+        if inside_enemy and not enemy_zone_logged and record_events:
+            enemy_zone_logged = True
+            events.append(SimulationEvent(timeSeconds=time_seconds, description=f"T+{time_seconds:.1f}s: Aircraft entered enemy airspace"))
+        if not departed_logged and aircraft_progress_distance > 0 and record_events:
+            departed_logged = True
+            events.append(SimulationEvent(timeSeconds=time_seconds, description=f"T+{time_seconds:.1f}s: Aircraft departed base"))
+
+        if not locked and distance_to_enemy <= DETECTION_RANGE_KM and time_seconds >= detection_delay:
+            locked = True
+            if record_events and not detection_logged:
+                detection_logged = True
+                events.append(SimulationEvent(timeSeconds=time_seconds, description=f"T+{time_seconds:.1f}s: Target detected"))
+
+        if locked and not intercepted and distance_to_enemy <= INTERCEPT_THRESHOLD_KM:
+            intercepted = True
+            intercept_time = time_seconds
+            if record_events:
+                events.append(SimulationEvent(timeSeconds=time_seconds, description=f"T+{time_seconds:.1f}s: Intercept achieved"))
+
+        distance_delta = max(0.0, aircraft_progress_distance - last_aircraft_distance)
+        fuel_consumption = distance_delta * (100.0 / max(aircraft_range, 1.0))
+        fuel_remaining = max(0.0, fuel_remaining - fuel_consumption)
+        last_aircraft_distance = aircraft_progress_distance
+
+        if fuel_remaining <= 0.0 and not fuel_failure_logged and record_events:
+            fuel_failure_logged = True
+            events.append(SimulationEvent(timeSeconds=time_seconds, description=f"T+{time_seconds:.1f}s: Simulation aborted (fuel depleted)"))
+
+        step_status = (
+            "intercepted"
+            if intercepted
+            else "failed"
+            if fuel_remaining <= 0.0
+            else "locked"
+            if locked
+            else "searching"
+        )
+
+        if time_seconds >= max_time_seconds and not intercepted and record_events and not timeout_logged:
+            timeout_logged = True
+            events.append(SimulationEvent(timeSeconds=time_seconds, description=f"T+{time_seconds:.1f}s: Mission timed out"))
+            step_status = "failed"
+
+        if record_timeline:
+            flags: list[str] = []
+            if locked:
+                flags.append("locked")
+            if inside_enemy:
+                flags.append("in_enemy_zone")
+            if intercepted:
+                flags.append("intercepted")
+            if step_status == "failed":
+                flags.append("failed")
+
+            timeline.append(
+                SimulationTimelineStep(
+                    timeSeconds=round(time_seconds, 2),
+                    aircraftPosition=Coordinate(lat=aircraft_pos.lat, lng=aircraft_pos.lng),
+                    enemyPosition=Coordinate(lat=enemy_pos.lat, lng=enemy_pos.lng),
+                    fuelRemaining=round(fuel_remaining, 2),
+                    distanceToTarget=round(distance_to_enemy, 3),
+                    aircraftSpeedKmh=round(aircraft_speed, 2),
+                    targetSpeedKmh=round(target_speed, 2),
+                    status=step_status,
+                    statusFlags=flags,
+                )
+            )
+
+        if intercepted or fuel_remaining <= 0.0 or time_seconds >= max_time_seconds:
+            break
+
+        time_seconds += step_seconds
+
+    final_status = "intercepted" if intercepted else "failed"
+    return {
+        "status": final_status,
+        "intercept_time": intercept_time,
+        "fuel_remaining": fuel_remaining,
+        "time_elapsed": time_seconds,
+        "timeline": timeline,
+        "event_log": events,
+        "time_in_enemy_airspace": time_in_enemy_airspace,
+    }
+
+
 @router.get("/airspace-zones", response_model=list[AirspaceZoneRead])
 def list_airspace_zones(db: Session = Depends(get_db)):
     zones = db.query(AirspaceZone).order_by(AirspaceZone.id.asc()).all()
@@ -276,6 +474,7 @@ def run_simulation(payload: SimulationRunRequest, db: Session = Depends(get_db))
     best_aircraft = aircraft_by_id[best_aircraft_id]
     outbound = [base, *payload.aircraftRouteWaypoints, intercept_point]
     full_flight_path = [*outbound, base]
+    outbound_distance = _polyline_distance_km(outbound)
     full_flight_distance = _polyline_distance_km(full_flight_path)
     aircraft_range = _aircraft_range_km(best_aircraft.model)
     fuel_feasibility = _normalize((aircraft_range / max(full_flight_distance, 1.0)) * 100.0)
@@ -326,6 +525,96 @@ def run_simulation(payload: SimulationRunRequest, db: Session = Depends(get_db))
         "aircraft route starts from base and returns to base after intercept."
     )
 
+    aircraft_map = _build_distance_map(outbound)
+    enemy_map = _build_distance_map(mission_route)
+    enemy_total_distance = enemy_map[-1][1] if enemy_map else 0.0
+    straight_distance = _haversine_km(base, intercept_point)
+    expected_air_seconds = (outbound_distance / max(_aircraft_speed_kmh(best_aircraft.model), 1.0)) * 3600.0
+    expected_target_seconds = (ship_time_h if ship_time_h > 0 else air_time_h) * 3600.0
+    max_time_seconds = max(expected_air_seconds, expected_target_seconds) * 1.4 + 120.0
+    max_time_seconds = max(max_time_seconds, 600.0)
+
+    seed = _seed_from_payload(payload)
+    success_hits = 0
+    base_simulation: dict | None = None
+    base_aircraft_speed = _aircraft_speed_kmh(best_aircraft.model)
+
+    for run_index in range(SIMULATION_VARIANTS):
+        rng = random.Random(seed + run_index)
+        reaction_delay = rng.uniform(*REACTION_DELAY_RANGE)
+        detection_delay = rng.uniform(*DETECTION_DELAY_RANGE)
+        aircraft_speed_variation = base_aircraft_speed * rng.uniform(0.97, 1.03)
+        target_speed_variation = max(0.0, target_speed * rng.uniform(0.94, 1.04) + rng.uniform(-2.0, 2.0))
+        simulation_result = _simulate_timeline(
+            aircraft_map=aircraft_map,
+            path_distance=outbound_distance,
+            enemy_map=enemy_map,
+            enemy_distance=enemy_total_distance,
+            aircraft_speed=aircraft_speed_variation,
+            target_speed=target_speed_variation,
+            reaction_delay=reaction_delay,
+            detection_delay=detection_delay,
+            step_seconds=TIMELINE_STEP_SECONDS,
+            max_time_seconds=max_time_seconds,
+            aircraft_range=aircraft_range,
+            enemy_zones=enemy_zones,
+            record_timeline=run_index == 0,
+            record_events=run_index == 0,
+        )
+        if run_index == 0:
+            base_simulation = simulation_result
+        if simulation_result["status"] == "intercepted":
+            success_hits += 1
+
+    if base_simulation is None:
+        raise HTTPException(status_code=500, detail="Unable to generate simulation timeline")
+
+    success_rate_percent = (success_hits / SIMULATION_VARIANTS) * 100.0
+    timeline = base_simulation["timeline"]
+    event_log = base_simulation["event_log"]
+    time_in_enemy_airspace = base_simulation["time_in_enemy_airspace"]
+    time_elapsed_seconds = base_simulation["time_elapsed"]
+    fuel_remaining = base_simulation["fuel_remaining"]
+    intercept_seconds = base_simulation["intercept_time"]
+    mission_result_status = "Success" if base_simulation["status"] == "intercepted" else "Failed"
+
+    fuel_consumed = max(0.0, 100.0 - fuel_remaining)
+    time_hours = max(time_elapsed_seconds / 3600.0, 1e-3)
+    fuel_consumption_rate = fuel_consumed / time_hours
+    remaining_range = aircraft_range * (fuel_remaining / 100.0)
+    exposure_percentage = min(100.0, (time_in_enemy_airspace / max(time_elapsed_seconds, 1.0)) * 100.0) if time_elapsed_seconds > 0 else 0.0
+
+    metrics = SimulationMetrics(
+        trajectory=SimulationTrajectoryMetrics(
+            totalDistanceKm=round(full_flight_distance, 2),
+            pathDeviationKm=round(max(0.0, outbound_distance - straight_distance), 2),
+            interceptPoint=intercept_point,
+            interceptTimeSeconds=intercept_seconds,
+        ),
+        fuel=SimulationFuelMetrics(
+            fuelConsumptionRatePerHour=round(fuel_consumption_rate, 2),
+            remainingRangeKm=round(remaining_range, 2),
+            returnFeasibility=round(fuel_feasibility, 2),
+        ),
+        threat=SimulationThreatMetrics(
+            timeInEnemyAirspaceSeconds=round(time_in_enemy_airspace, 2),
+            exposurePercentage=round(exposure_percentage, 2),
+            enemyStrengthImpact=round(enemy_strength, 2),
+        ),
+        performance=SimulationPerformanceMetrics(
+            pilotEfficiency=round(pilot_skill, 2),
+            weaponReadiness=round(weapon_effect, 2),
+        ),
+    )
+
+    final_result = SimulationFinalResult(
+        status=mission_result_status,
+        interceptTimeSeconds=intercept_seconds,
+        successRatePercent=round(success_rate_percent, 2),
+        timeElapsedSeconds=round(time_elapsed_seconds, 2),
+        fuelRemaining=round(fuel_remaining, 2),
+    )
+
     return SimulationRunResponse(
         baseLocation=base,
         interceptLocation=intercept_point,
@@ -342,4 +631,8 @@ def run_simulation(payload: SimulationRunRequest, db: Session = Depends(get_db))
         selectedPilots=selected_pilot_context,
         aircraftUsed=aircraft_ids,
         weaponLoadout=payload.weaponLoadout,
+        timeline=timeline,
+        finalResult=final_result,
+        metrics=metrics,
+        eventLog=event_log,
     )

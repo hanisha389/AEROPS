@@ -71,21 +71,8 @@ class PilotMedicalDetailsBase(BaseModel):
     currentStatus: str = "Fit for Flight"
     lastMedicalCheckDate: Optional[str] = None
     nextDueCheck: Optional[str] = None
-    heartRate: Optional[str] = None
-    bloodPressure: Optional[str] = None
-    oxygenSaturation: Optional[str] = None
-    visionStatus: Optional[str] = None
-    gToleranceLevel: Optional[str] = None
     pastInjuries: list[str] = Field(default_factory=list)
-    surgeries: list[str] = Field(default_factory=list)
-    chronicConditions: list[str] = Field(default_factory=list)
-    medication: list[str] = Field(default_factory=list)
     fatigueLevel: Optional[str] = None
-    stressLevel: Optional[str] = None
-    sleepQualityScore: Optional[float] = 0
-    cognitiveReadiness: Optional[float] = 0
-    lastClearedForFlight: Optional[str] = None
-    clearedBy: Optional[str] = None
     clearanceRemarks: Optional[str] = None
     safeToAssign: bool = True
 
@@ -94,9 +81,6 @@ class PilotMedicalLogRead(BaseModel):
     id: int
     flightContext: str
     fatigueLevel: Optional[str] = None
-    stressLevel: Optional[str] = None
-    sleepQualityScore: Optional[float] = None
-    cognitiveReadiness: Optional[float] = None
     safeToAssign: bool
     remarks: Optional[str] = None
     createdAt: str
@@ -108,23 +92,25 @@ class PilotBase(BaseModel):
     rank: str
     callSign: str
     assignedAircraft: Optional[str] = None
-    status: str = "Active"
+    status: str = "ACTIVE"
     onHoliday: bool = False
     image: str = Field(..., min_length=3)
 
 
 class PilotCreate(PilotBase):
+    skillLevel: str = "Intermediate"
     personalDetails: PilotPersonalDetailsBase
+    medical: PilotMedicalBase = Field(default_factory=PilotMedicalBase)
+    medicalDetails: PilotMedicalDetailsBase = Field(default_factory=PilotMedicalDetailsBase)
     operationalStatus: PilotOperationalStatusBase = Field(default_factory=PilotOperationalStatusBase)
     qualifications: PilotQualificationsBase = Field(default_factory=PilotQualificationsBase)
     performanceMetrics: PilotPerformanceMetricsBase = Field(default_factory=PilotPerformanceMetricsBase)
-    medical: PilotMedicalBase = Field(default_factory=PilotMedicalBase)
-    medicalDetails: PilotMedicalDetailsBase = Field(default_factory=PilotMedicalDetailsBase)
     missions: list[PilotMissionBase] = Field(default_factory=list)
 
 
 class PilotRead(PilotBase):
     id: int
+    skillLevel: str = "Intermediate"
     injury: str
     medicalReport: str
     medical: PilotMedicalRead
@@ -139,3 +125,11 @@ class PilotRead(PilotBase):
 
     class Config:
         from_attributes = True
+
+
+class PilotUpdate(BaseModel):
+    name: str
+    assignedAircraft: Optional[str] = None
+    skillLevel: str
+    status: str
+    leaveApplied: bool = False

@@ -1,6 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.dependencies.db import get_db
+from app.dependencies.roles import (
+    ROLE_ADMIN_COMMANDER,
+    ROLE_PILOT,
+    RequestContext,
+    get_request_context,
+)
 from app.models.pilot import (
     Pilot,
     PilotMedical,
@@ -13,9 +19,25 @@ from app.models.pilot import (
     PilotQualifications,
 )
 from app.models.training import PilotTrainingLog
-from app.schemas.pilot import PilotCreate, PilotRead
+from app.schemas.pilot import PilotCreate, PilotRead, PilotUpdate
 
 router = APIRouter(prefix="/pilots", tags=["pilots"])
+
+
+def _normalize_status(value: str | None) -> str:
+    if not value:
+        return "ACTIVE"
+    raw = value.strip().upper()
+    alias = {
+        "ACTIVE": "ACTIVE",
+        "INACTIVE": "INACTIVE",
+        "ON LEAVE": "ON LEAVE",
+        "ON_LEAVE": "ON LEAVE",
+        "MEDICAL HOLD": "MEDICAL HOLD",
+        "MEDICAL_HOLD": "MEDICAL HOLD",
+        "ACTIVE DUTY": "ACTIVE",
+    }
+    return alias.get(raw, raw)
 
 
 def _to_schema(pilot: Pilot) -> PilotRead:
@@ -51,9 +73,6 @@ def _to_schema(pilot: Pilot) -> PilotRead:
             "id": entry.id,
             "flightContext": entry.flight_context,
             "fatigueLevel": entry.fatigue_level,
-            "stressLevel": entry.stress_level,
-            "sleepQualityScore": entry.sleep_quality_score,
-            "cognitiveReadiness": entry.cognitive_readiness,
             "safeToAssign": entry.safe_to_assign,
             "remarks": entry.remarks,
             "createdAt": entry.created_at,
@@ -80,8 +99,9 @@ def _to_schema(pilot: Pilot) -> PilotRead:
         rank=pilot.rank,
         callSign=pilot.call_sign,
         assignedAircraft=pilot.assigned_aircraft,
-        status=pilot.status,
+        status=_normalize_status(pilot.status),
         onHoliday=pilot.on_holiday,
+        skillLevel=qualifications.training_level,
         image=pilot.face_url,
         injury=medical.injuries,
         medicalReport=report,
@@ -124,21 +144,8 @@ def _to_schema(pilot: Pilot) -> PilotRead:
             "currentStatus": medical_details.current_status,
             "lastMedicalCheckDate": medical_details.last_medical_check_date,
             "nextDueCheck": medical_details.next_due_check,
-            "heartRate": medical_details.heart_rate,
-            "bloodPressure": medical_details.blood_pressure,
-            "oxygenSaturation": medical_details.oxygen_saturation,
-            "visionStatus": medical_details.vision_status,
-            "gToleranceLevel": medical_details.g_tolerance_level,
             "pastInjuries": [item for item in (medical_details.past_injuries or "").split("|") if item],
-            "surgeries": [item for item in (medical_details.surgeries or "").split("|") if item],
-            "chronicConditions": [item for item in (medical_details.chronic_conditions or "").split("|") if item],
-            "medication": [item for item in (medical_details.medication or "").split("|") if item],
             "fatigueLevel": medical_details.fatigue_level,
-            "stressLevel": medical_details.stress_level,
-            "sleepQualityScore": medical_details.sleep_quality_score,
-            "cognitiveReadiness": medical_details.cognitive_readiness,
-            "lastClearedForFlight": medical_details.last_cleared_for_flight,
-            "clearedBy": medical_details.cleared_by,
             "clearanceRemarks": medical_details.clearance_remarks,
             "safeToAssign": medical_details.safe_to_assign,
         },
@@ -149,13 +156,19 @@ def _to_schema(pilot: Pilot) -> PilotRead:
 
 
 @router.get("", response_model=list[PilotRead])
-def list_pilots(db: Session = Depends(get_db)):
+def list_pilots(db: Session = Depends(get_db), context: RequestContext = Depends(get_request_context)):
+    if context.role not in {ROLE_ADMIN_COMMANDER, ROLE_PILOT}:
+        raise HTTPException(status_code=403, detail="Role is not allowed to access pilot data")
+
     pilots = db.query(Pilot).all()
     return [_to_schema(pilot) for pilot in pilots]
 
 
 @router.get("/{pilot_id}", response_model=PilotRead)
-def get_pilot(pilot_id: int, db: Session = Depends(get_db)):
+def get_pilot(pilot_id: int, db: Session = Depends(get_db), context: RequestContext = Depends(get_request_context)):
+    if context.role not in {ROLE_ADMIN_COMMANDER, ROLE_PILOT}:
+        raise HTTPException(status_code=403, detail="Role is not allowed to access pilot data")
+
     pilot = db.query(Pilot).filter(Pilot.id == pilot_id).first()
     if not pilot:
         raise HTTPException(status_code=404, detail="Pilot not found")
@@ -163,7 +176,14 @@ def get_pilot(pilot_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=PilotRead, status_code=status.HTTP_201_CREATED)
-def create_pilot(payload: PilotCreate, db: Session = Depends(get_db)):
+def create_pilot(
+    payload: PilotCreate,
+    db: Session = Depends(get_db),
+    context: RequestContext = Depends(get_request_context),
+):
+    if context.role != ROLE_ADMIN_COMMANDER:
+        raise HTTPException(status_code=403, detail="Only admin/commander can create pilots")
+
     existing = db.query(Pilot).filter(Pilot.registration_number == payload.registrationNumber).first()
     if existing:
         raise HTTPException(status_code=409, detail="Pilot registration number already exists")
@@ -177,7 +197,7 @@ def create_pilot(payload: PilotCreate, db: Session = Depends(get_db)):
         rank=payload.rank,
         call_sign=payload.callSign,
         assigned_aircraft=payload.assignedAircraft,
-        status=payload.status,
+        status=_normalize_status(payload.status),
         on_holiday=payload.onHoliday,
         face_url=payload.image,
     )
@@ -223,7 +243,7 @@ def create_pilot(payload: PilotCreate, db: Session = Depends(get_db)):
             total_flight_hours=payload.qualifications.totalFlightHours,
             flight_hours_per_aircraft="",
             specializations="|".join(payload.qualifications.specializations),
-            training_level=payload.qualifications.trainingLevel,
+            training_level=payload.skillLevel or payload.qualifications.trainingLevel,
             simulator_score=payload.qualifications.simulatorPerformanceScore,
         )
     )
@@ -245,21 +265,8 @@ def create_pilot(payload: PilotCreate, db: Session = Depends(get_db)):
             current_status=payload.medicalDetails.currentStatus,
             last_medical_check_date=payload.medicalDetails.lastMedicalCheckDate,
             next_due_check=payload.medicalDetails.nextDueCheck,
-            heart_rate=payload.medicalDetails.heartRate,
-            blood_pressure=payload.medicalDetails.bloodPressure,
-            oxygen_saturation=payload.medicalDetails.oxygenSaturation,
-            vision_status=payload.medicalDetails.visionStatus,
-            g_tolerance_level=payload.medicalDetails.gToleranceLevel,
             past_injuries="|".join(payload.medicalDetails.pastInjuries),
-            surgeries="|".join(payload.medicalDetails.surgeries),
-            chronic_conditions="|".join(payload.medicalDetails.chronicConditions),
-            medication="|".join(payload.medicalDetails.medication),
             fatigue_level=payload.medicalDetails.fatigueLevel,
-            stress_level=payload.medicalDetails.stressLevel,
-            sleep_quality_score=payload.medicalDetails.sleepQualityScore,
-            cognitive_readiness=payload.medicalDetails.cognitiveReadiness,
-            last_cleared_for_flight=payload.medicalDetails.lastClearedForFlight,
-            cleared_by=payload.medicalDetails.clearedBy,
             clearance_remarks=payload.medicalDetails.clearanceRemarks,
             safe_to_assign=payload.medicalDetails.safeToAssign,
         )
@@ -277,6 +284,54 @@ def create_pilot(payload: PilotCreate, db: Session = Depends(get_db)):
                 notes=mission.notes,
             )
         )
+
+    db.commit()
+    db.refresh(pilot)
+    return _to_schema(pilot)
+
+
+@router.put("/{pilot_id}", response_model=PilotRead)
+def update_pilot(
+    pilot_id: int,
+    payload: PilotUpdate,
+    db: Session = Depends(get_db),
+    context: RequestContext = Depends(get_request_context),
+):
+    if context.role != ROLE_ADMIN_COMMANDER:
+        raise HTTPException(status_code=403, detail="Only admin/commander can update pilots")
+
+    pilot = db.query(Pilot).filter(Pilot.id == pilot_id).first()
+    if not pilot:
+        raise HTTPException(status_code=404, detail="Pilot not found")
+
+    qualifications = pilot.qualifications
+    if not qualifications:
+        qualifications = PilotQualifications(pilot_id=pilot.id, training_level=payload.skillLevel, simulator_score=0, total_flight_hours=0)
+        db.add(qualifications)
+
+    medical = pilot.medical
+    fit_for_duty = True if not medical else medical.fit_for_duty
+
+    requested_status = _normalize_status(payload.status)
+    if payload.leaveApplied:
+        requested_status = "ON LEAVE"
+    if not fit_for_duty:
+        requested_status = "MEDICAL HOLD"
+
+    allowed_status = {"ACTIVE", "INACTIVE", "ON LEAVE", "MEDICAL HOLD"}
+    if requested_status not in allowed_status:
+        raise HTTPException(status_code=400, detail="Invalid pilot status")
+
+    pilot.name = payload.name
+    pilot.assigned_aircraft = payload.assignedAircraft
+    pilot.status = requested_status
+    pilot.on_holiday = requested_status == "ON LEAVE"
+    qualifications.training_level = payload.skillLevel
+
+    operational = pilot.operational_status
+    if operational:
+        operational.operational_state = requested_status
+        operational.assigned_aircraft_type = payload.assignedAircraft
 
     db.commit()
     db.refresh(pilot)

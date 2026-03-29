@@ -1,12 +1,36 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.dependencies.db import get_db
+from app.dependencies.roles import ROLE_ADMIN_COMMANDER, ROLE_ENGINEER, require_roles
 from datetime import datetime
 from app.models.engineer import Engineer, EngineerMaintenanceLog, EngineerMaintenanceReport
-from app.models.aircraft import AircraftIssue
+from app.models.aircraft import Aircraft, AircraftComponentStatus, AircraftIssue
+from app.models.maintenance import AircraftMaintenanceLog
 from app.schemas.engineer import EngineerCreate, EngineerMaintenanceLogCreate, EngineerMaintenanceStatusUpdate, EngineerRead
 
-router = APIRouter(prefix="/engineers", tags=["engineers"])
+router = APIRouter(
+    prefix="/engineers",
+    tags=["engineers"],
+    dependencies=[Depends(require_roles(ROLE_ADMIN_COMMANDER, ROLE_ENGINEER))],
+)
+
+
+def _is_completed_status(value: str) -> bool:
+    return (value or "").strip().upper() in {"COMPLETED", "COMPLETE"}
+
+
+def _issue_component_from_log(log: EngineerMaintenanceLog) -> str | None:
+    note = (log.notes or "").lower()
+    for component in ["landingGear", "avionics", "engine", "wings", "fuel"]:
+        if component.lower() in note:
+            return component
+
+    work_item = (log.work_item or "").lower()
+    for component in ["landingGear", "avionics", "engine", "wings", "fuel"]:
+        if component.lower() in work_item:
+            return component
+
+    return None
 
 
 def _to_schema(engineer: Engineer) -> EngineerRead:
@@ -183,6 +207,54 @@ def update_engineer_log_status(
     else:
         report.completion_status = payload.completionStatus
         report.updated_at = datetime.utcnow().isoformat()
+
+    if _is_completed_status(payload.completionStatus) and log.aircraft_id:
+        issue_component = _issue_component_from_log(log)
+        issue_query = db.query(AircraftIssue).filter(
+            AircraftIssue.aircraft_id == log.aircraft_id,
+            AircraftIssue.status.in_(["Open", "Assigned"]),
+        )
+        if issue_component:
+            issue_query = issue_query.filter(AircraftIssue.component == issue_component)
+
+        issue = issue_query.order_by(AircraftIssue.id.asc()).first()
+        if issue:
+            issue.status = "Resolved"
+
+        if issue_component:
+            component_row = db.query(AircraftComponentStatus).filter(
+                AircraftComponentStatus.aircraft_id == log.aircraft_id,
+                AircraftComponentStatus.component == issue_component,
+            ).first()
+            if component_row:
+                component_row.status = "Good"
+                component_row.notes = log.notes
+
+        has_open_issues = (
+            db.query(AircraftIssue)
+            .filter(
+                AircraftIssue.aircraft_id == log.aircraft_id,
+                AircraftIssue.status.in_(["Open", "Assigned"]),
+            )
+            .first()
+            is not None
+        )
+
+        aircraft = db.query(Aircraft).filter(Aircraft.id == log.aircraft_id).first()
+        if aircraft:
+            aircraft.health_status = "MAINTENANCE" if has_open_issues else "READY"
+            if not has_open_issues:
+                aircraft.last_maintenance = datetime.utcnow().isoformat().split("T")[0]
+
+        db.add(
+            AircraftMaintenanceLog(
+                aircraft_id=log.aircraft_id,
+                log_type="ENGINEER_TASK_COMPLETION",
+                summary=f"Engineer task completed for {log.aircraft_id}: {log.work_item}",
+                document_id=None,
+                created_at=datetime.utcnow().isoformat(),
+            )
+        )
 
     db.commit()
     db.refresh(engineer)
