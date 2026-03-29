@@ -25,3 +25,13 @@ class SimulationBaseLocation(Base):
     id = Column(Integer, primary_key=True, index=True)
     lat = Column(Float, nullable=False)
     lng = Column(Float, nullable=False)
+
+
+class AirspaceZoneVertex(Base):
+    __tablename__ = "airspace_zone_vertices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    zone_id = Column(Integer, nullable=False, index=True)
+    vertex_order = Column(Integer, nullable=False)
+    lat = Column(Float, nullable=False)
+    lng = Column(Float, nullable=False)

@@ -1,8 +1,8 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import BackgroundLayout from "@/components/BackgroundLayout";
 import PageHeader from "@/components/PageHeader";
-import { api, OpenIssue } from "@/lib/api";
+import { api } from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
 
 interface MaintenanceLog {
@@ -13,6 +13,7 @@ interface MaintenanceLog {
   description?: string;
   isCurrent?: boolean;
   completionStatus?: string;
+  issueId?: number;
 }
 
 interface Engineer {
@@ -26,65 +27,58 @@ interface Engineer {
   maintenanceLogs: MaintenanceLog[];
 }
 
+const normalizeStatus = (value?: string) => (value || "PENDING").trim().toUpperCase().replace(/\s+/g, "_");
+
+const parseLogDetails = (description?: string) => {
+  if (!description) {
+    return { component: "N/A", severity: "N/A", details: "No details" };
+  }
+
+  const fields: Record<string, string> = {};
+  description.split(";").forEach((part) => {
+    const [key, ...rest] = part.split("=");
+    if (!key || !rest.length) {
+      return;
+    }
+    fields[key.trim().toLowerCase()] = rest.join("=").trim();
+  });
+
+  return {
+    component: fields.component || "N/A",
+    severity: fields.severity || "N/A",
+    details: fields.details || description,
+  };
+};
+
 const EngineerDetail = () => {
-  const componentOptions = ["engine", "wings", "avionics", "fuel", "landingGear"];
   const { id } = useParams();
   const [engineer, setEngineer] = useState<Engineer | null>(null);
-  const [issues, setIssues] = useState<OpenIssue[]>([]);
-  const [task, setTask] = useState({ aircraft: "", type: "Repair", component: "engine", isCurrent: true, issueId: "" });
 
   const sortedLogs = useMemo(() => {
     if (!engineer) return [];
     return [...engineer.maintenanceLogs].sort((a, b) => b.date.localeCompare(a.date));
   }, [engineer]);
 
+  const activeTasks = useMemo(
+    () => sortedLogs.filter((log) => log.issueId != null && normalizeStatus(log.completionStatus) !== "COMPLETE" && normalizeStatus(log.completionStatus) !== "COMPLETED"),
+    [sortedLogs],
+  );
+
+  const completedTasks = useMemo(
+    () => sortedLogs.filter((log) => log.issueId != null && (normalizeStatus(log.completionStatus) === "COMPLETE" || normalizeStatus(log.completionStatus) === "COMPLETED")),
+    [sortedLogs],
+  );
+
   const updateLogStatus = async (logId: number, completionStatus: string) => {
     if (!engineer) return;
     const updated = await api.updateEngineerLogStatus(engineer.id, logId, completionStatus);
     setEngineer(updated);
-    api.getOpenIssues().then(setIssues);
   };
 
   useEffect(() => {
     if (!id) return;
     api.getEngineerById(Number(id)).then(setEngineer);
-    api.getOpenIssues().then(setIssues);
   }, [id]);
-
-  const assignIssue = (issueId: number) => {
-    const issue = issues.find((item) => item.id === issueId);
-    if (!issue) return;
-    setTask({
-      aircraft: issue.aircraftId,
-      type: "Repair",
-      component: issue.component,
-      isCurrent: true,
-      issueId: String(issue.id),
-    });
-  };
-
-  const handleAssign = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!engineer) return;
-    if (!task.issueId) {
-      window.alert("Select an aircraft issue before assigning work.");
-      return;
-    }
-
-    const date = new Date().toISOString().slice(0, 10);
-    const updated = await api.addEngineerLog(engineer.id, {
-      aircraft: task.aircraft,
-      type: task.type,
-      description: `${task.component} issue - assigned for ${task.type.toLowerCase()}`,
-      isCurrent: task.isCurrent,
-      issueId: task.issueId ? Number(task.issueId) : undefined,
-      date,
-    });
-    setEngineer(updated);
-    api.getOpenIssues().then(setIssues);
-
-    setTask({ aircraft: "", type: "Repair", component: "engine", isCurrent: true, issueId: "" });
-  };
 
   if (!engineer) {
     return (
@@ -113,61 +107,61 @@ const EngineerDetail = () => {
 
         <div className="space-y-5 lg:col-span-2">
           <div className="border border-border/40 bg-card/30 p-4">
-            <h3 className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">ASSIGN WORK</h3>
-            {issues.length > 0 && (
-              <select
-                className="mb-3 w-full border border-border bg-background/40 px-3 py-2"
-                value={task.issueId}
-                onChange={(e) => {
-                  setTask((prev) => ({ ...prev, issueId: e.target.value }));
-                  if (e.target.value) assignIssue(Number(e.target.value));
-                }}
-              >
-                <option value="">Select pending aircraft issue</option>
-                {issues.map((issue) => (
-                  <option key={issue.id} value={String(issue.id)}>
-                    {issue.aircraftId} - {issue.component} ({issue.severity})
-                  </option>
-                ))}
-              </select>
+            <h3 className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">ASSIGNED TASKS</h3>
+            {activeTasks.length === 0 && (
+              <p className="font-rajdhani text-sm text-muted-foreground">No active assigned issue tasks.</p>
             )}
-            <form onSubmit={handleAssign} className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <select className="border border-border bg-background/40 px-3 py-2" value={task.component} onChange={(e) => setTask({ ...task, component: e.target.value })}>
-                {componentOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-              <p className="border border-border bg-background/20 px-3 py-2 font-rajdhani text-sm text-muted-foreground">
-                Aircraft: <span className="text-primary">{task.aircraft || "Select issue first"}</span>
-              </p>
-              <p className="border border-border bg-background/20 px-3 py-2 font-rajdhani text-sm text-muted-foreground md:col-span-2">
-                Workflow: Select issue, assign to engineer, mark complete in maintenance log.
-              </p>
-              <button type="submit" className="border border-primary px-3 py-2 font-orbitron text-xs text-primary md:col-span-2">ASSIGN</button>
-            </form>
+            <div className="space-y-2">
+              {activeTasks.map((log) => {
+                const details = parseLogDetails(log.description);
+                const status = normalizeStatus(log.completionStatus);
+                return (
+                  <div key={log.id} className="border border-border/30 bg-background/20 p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="font-rajdhani text-sm text-primary">Aircraft: {log.aircraft || "N/A"}</p>
+                      <p className="font-rajdhani text-xs text-muted-foreground">Issue #{log.issueId}</p>
+                    </div>
+                    <p className="font-rajdhani text-xs text-muted-foreground">Component: {details.component}</p>
+                    <p className="font-rajdhani text-xs text-muted-foreground">Severity: {details.severity}</p>
+                    <p className="font-rajdhani text-xs text-muted-foreground">Assigned: {log.date}</p>
+                    <p className="font-rajdhani text-xs text-muted-foreground">Details: {details.details}</p>
+                    <p className="mt-1 font-rajdhani text-xs text-primary">Status: {status}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateLogStatus(log.id, "IN_PROGRESS")}
+                        disabled={status === "IN_PROGRESS"}
+                        className="border border-border px-3 py-1 font-orbitron text-[0.65rem] text-muted-foreground disabled:opacity-60"
+                      >
+                        MARK IN PROGRESS
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateLogStatus(log.id, "COMPLETE")}
+                        className="border border-primary px-3 py-1 font-orbitron text-[0.65rem] text-primary"
+                      >
+                        MARK COMPLETE
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="border border-border/40 bg-card/30 p-4">
-            <h3 className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">MAINTENANCE LOG</h3>
+            <h3 className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">COMPLETED TASK LOG</h3>
             <div className="space-y-2">
-              {sortedLogs.map((log, index) => (
+              {completedTasks.length === 0 && <p className="font-rajdhani text-sm text-muted-foreground">No completed issue tasks.</p>}
+              {completedTasks.map((log, index) => (
                 <div key={`${log.date}-${index}`} className="border border-border/30 bg-background/30 p-3">
                   <div className="flex items-center justify-between">
                     <p className="font-rajdhani text-sm text-primary">{log.aircraft || "N/A"}</p>
                     <p className="font-rajdhani text-xs text-muted-foreground">{log.date}</p>
                   </div>
-                  <p className="font-rajdhani text-xs text-muted-foreground">{log.type}</p>
+                  <p className="font-rajdhani text-xs text-muted-foreground">Issue #{log.issueId || "N/A"} - {log.type}</p>
                   <p className="font-rajdhani text-xs text-muted-foreground/80">{log.description || "No details"}</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <p className="font-rajdhani text-xs text-muted-foreground">Status:</p>
-                    <select
-                      className="border border-border bg-background/40 px-2 py-1 font-rajdhani text-xs"
-                      value={log.completionStatus || "Pending"}
-                      onChange={(e) => updateLogStatus(log.id, e.target.value)}
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="COMPLETE">COMPLETE</option>
-                    </select>
-                  </div>
+                  <p className="mt-1 font-rajdhani text-xs text-primary">Status: {normalizeStatus(log.completionStatus)}</p>
                 </div>
               ))}
             </div>

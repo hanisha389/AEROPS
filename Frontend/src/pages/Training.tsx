@@ -1,21 +1,22 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import BackgroundLayout from "@/components/BackgroundLayout";
 import PageHeader from "@/components/PageHeader";
 import HumanBodyModel from "@/components/HumanBodyModel";
 import { api } from "@/lib/api";
 import { getCurrentRole } from "@/lib/rbac";
 
+const DEBRIEF_KEY = "aerops-training-step2-debrief";
+
 type TrainingType = "Maneuver" | "Dogfight" | "Precision Bombing";
-type FuelLevel = "OK" | "LOW" | "CRITICAL";
 type SystemStatus = "OK" | "ISSUE";
-type WeaponSystems = "OK" | "NOT REQUIRED";
+type WingsStatus = "OK" | "DAMAGE";
+type FuelSystemStatus = "OK" | "LOW" | "CRITICAL" | "ISSUE";
 type OverallStatus = "READY" | "NOT READY";
 type YesNo = "YES" | "NO";
 type Fatigue = "LOW" | "MEDIUM" | "HIGH";
 type InjurySeverity = "MINOR" | "MAJOR";
 type Hydration = "OK" | "LOW";
-type CheckValue = "NORMAL" | "LOW";
-type TireCondition = "GOOD" | "WEAR";
 
 interface PilotOption {
   id: number;
@@ -23,24 +24,56 @@ interface PilotOption {
   callSign: string;
   status: string;
   assignedAircraft?: string | null;
+  skillLevel?: string;
+}
+
+interface SimulatorDebrief {
+  duration: string;
+  outcome: string;
+  notes: string;
+  elapsedSeconds?: number;
+  peakG?: number;
+  peakStress?: number;
+  peakHeartRate?: number;
+  peakFatigue?: number;
+  source?: "simulator" | "planned";
+  plannedPath?: string[];
+  actionSummary?: string[];
+  telemetrySummary?: {
+    speedMin?: number;
+    speedAvg?: number;
+    speedMax?: number;
+    altitudeAvg?: number;
+    altitudeMax?: number;
+    headingRange?: string;
+  };
+}
+
+interface PerformanceReview {
+  score: number;
+  grade: "EXCELLENT" | "GOOD" | "FAIR" | "NEEDS IMPROVEMENT";
+  summary: string;
+  recommendations: string[];
+  pilotBreakdown: {
+    pilotId: number;
+    callSign: string;
+    score: number;
+    grade: "EXCELLENT" | "GOOD" | "FAIR" | "NEEDS IMPROVEMENT";
+  }[];
 }
 
 interface ChecklistState {
-  fuelLevel: FuelLevel;
   engineStatus: SystemStatus;
-  avionicsCheck: SystemStatus;
-  weaponSystems: WeaponSystems;
+  wingsStatus: WingsStatus;
+  landingGearStatus: SystemStatus;
+  avionicsStatus: SystemStatus;
+  fuelSystemStatus: FuelSystemStatus;
   overallStatus: OverallStatus;
-  hydraulicPressure: CheckValue;
-  tireCondition: TireCondition;
-  navSystems: SystemStatus;
 }
 
 interface PostChecklistState extends ChecklistState {
   damageObserved: YesNo;
   maintenanceRequired: YesNo;
-  fluidLeakDetected: YesNo;
-  birdStrikeSigns: YesNo;
 }
 
 interface MedicalState {
@@ -59,22 +92,18 @@ interface PilotPreInspection {
 }
 
 const preCheckDefaults: ChecklistState = {
-  fuelLevel: "OK",
   engineStatus: "OK",
-  avionicsCheck: "OK",
-  weaponSystems: "OK",
+  wingsStatus: "OK",
+  landingGearStatus: "OK",
+  avionicsStatus: "OK",
+  fuelSystemStatus: "OK",
   overallStatus: "READY",
-  hydraulicPressure: "NORMAL",
-  tireCondition: "GOOD",
-  navSystems: "OK",
 };
 
 const postCheckDefaults: PostChecklistState = {
   ...preCheckDefaults,
   damageObserved: "NO",
   maintenanceRequired: "NO",
-  fluidLeakDetected: "NO",
-  birdStrikeSigns: "NO",
 };
 
 const pilotInspectionDefaults: PilotPreInspection = {
@@ -86,8 +115,34 @@ const pilotInspectionDefaults: PilotPreInspection = {
 
 const durationOptions = ["20 min", "30 min", "45 min", "60 min", "90 min"];
 
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+const getSkillFactor = (skillLevel?: string) => {
+  const value = (skillLevel || "").toLowerCase();
+  if (value.includes("expert") || value.includes("ace") || value.includes("advanced")) {
+    return 1.18;
+  }
+  if (value.includes("rookie") || value.includes("novice") || value.includes("beginner") || value.includes("cadet")) {
+    return 0.86;
+  }
+  return 1.0;
+};
+
+const gradeFromScore = (score: number): PerformanceReview["grade"] => {
+  if (score >= 85) return "EXCELLENT";
+  if (score >= 72) return "GOOD";
+  if (score >= 58) return "FAIR";
+  return "NEEDS IMPROVEMENT";
+};
+
+const parseDurationMinutes = (raw: string) => {
+  const match = raw.match(/\d+/);
+  return Number(match?.[0] || 30);
+};
+
 const Training = () => {
   const role = getCurrentRole();
+  const navigate = useNavigate();
 
   const [step, setStep] = useState(0);
   const [trainingType, setTrainingType] = useState<TrainingType>("Maneuver");
@@ -99,8 +154,7 @@ const Training = () => {
   const [postCheckByAircraft, setPostCheckByAircraft] = useState<Record<string, PostChecklistState>>({});
   const [pilotPreInspectionByPilot, setPilotPreInspectionByPilot] = useState<Record<number, PilotPreInspection>>({});
   const [medicalByPilot, setMedicalByPilot] = useState<Record<number, MedicalState>>({});
-  const [trainingRunning, setTrainingRunning] = useState(false);
-  const [debrief, setDebrief] = useState<{ duration: string; outcome: string; notes: string } | null>(null);
+  const [debrief, setDebrief] = useState<SimulatorDebrief | null>(null);
   const [completionDebrief, setCompletionDebrief] = useState<{
     trainingType: TrainingType;
     duration: string;
@@ -116,15 +170,175 @@ const Training = () => {
     api.getPilots().then((rows) => setPilotOptions(rows));
   }, []);
 
+  useEffect(() => {
+    const raw = sessionStorage.getItem(DEBRIEF_KEY);
+    if (!raw) {
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw) as SimulatorDebrief;
+      if (parsed?.duration && parsed?.outcome && parsed?.notes != null) {
+        setDebrief(parsed);
+        setStep((prev) => Math.max(prev, 3));
+      }
+    } catch {
+      // Ignore malformed simulator payload.
+    } finally {
+      sessionStorage.removeItem(DEBRIEF_KEY);
+    }
+  }, []);
+
   const activePilotOptions = useMemo(
     () => pilotOptions.filter((pilot) => (pilot.status || "").toUpperCase() === "ACTIVE"),
     [pilotOptions],
   );
 
   const selectedPilotObjects = useMemo(
-    () => activePilotOptions.filter((pilot) => selectedPilots.includes(pilot.id)),
-    [activePilotOptions, selectedPilots],
+    () => pilotOptions.filter((pilot) => selectedPilots.includes(pilot.id)),
+    [pilotOptions, selectedPilots],
   );
+
+  const plannedPath = useMemo(() => {
+    if (trainingType === "Dogfight") {
+      return [
+        "Takeoff and formation build",
+        "Acceleration lane",
+        "Lead turn left",
+        "Defensive break right",
+        "Altitude ladder climb",
+        "Rejoin and controlled hold",
+      ];
+    }
+    if (trainingType === "Precision Bombing") {
+      return [
+        "Takeoff and climb",
+        "Ingress corridor hold",
+        "Target approach turn",
+        "Stabilized strike pass",
+        "Egress climb",
+        "Return hold pattern",
+      ];
+    }
+    return [
+      "Takeoff roll and climb",
+      "Speed build segment",
+      "Left turn pattern",
+      "Right correction",
+      "Altitude hold",
+      "Return and settle",
+    ];
+  }, [trainingType]);
+
+  const generatePlannedDebrief = () => {
+    if (selectedPilotObjects.length === 0) {
+      return null;
+    }
+
+    const avgSkill = selectedPilotObjects
+      .map((pilot) => getSkillFactor(pilot.skillLevel))
+      .reduce((sum, value) => sum + value, 0) / selectedPilotObjects.length;
+    const missionLoad = trainingType === "Dogfight" ? 1.2 : trainingType === "Precision Bombing" ? 1.1 : 1;
+    const minutes = parseDurationMinutes(duration);
+
+    const peakG = clamp(3.4 * missionLoad - (avgSkill - 1) * 1.1, 2.1, 5.6);
+    const peakStress = clamp(46 * missionLoad - (avgSkill - 1) * 22, 18, 88);
+    const peakHeartRate = clamp(136 * missionLoad - (avgSkill - 1) * 16, 92, 188);
+    const peakFatigue = clamp(40 * missionLoad - (avgSkill - 1) * 15, 12, 84);
+
+    const baseSpeed = trainingType === "Precision Bombing" ? 255 : trainingType === "Dogfight" ? 295 : 270;
+    const speedAvg = clamp(baseSpeed + (avgSkill - 1) * 22, 210, 340);
+    const speedMin = clamp(speedAvg - 42, 160, 300);
+    const speedMax = clamp(speedAvg + 38, 210, 390);
+    const altitudeAvg = trainingType === "Dogfight" ? 3450 : 3150;
+    const altitudeMax = altitudeAvg + 650;
+
+    return {
+      duration,
+      outcome: "Completed",
+      notes: notes?.trim() || `Auto-generated debrief from planned ${trainingType.toLowerCase()} route.`,
+      elapsedSeconds: minutes * 60,
+      peakG: Number(peakG.toFixed(2)),
+      peakStress: Number(peakStress.toFixed(1)),
+      peakHeartRate: Number(peakHeartRate.toFixed(0)),
+      peakFatigue: Number(peakFatigue.toFixed(1)),
+      source: "planned" as const,
+      plannedPath,
+      actionSummary: plannedPath.map((stepLabel, index) => `AUTO STEP ${index + 1}: ${stepLabel}`),
+      telemetrySummary: {
+        speedMin: Number(speedMin.toFixed(1)),
+        speedAvg: Number(speedAvg.toFixed(1)),
+        speedMax: Number(speedMax.toFixed(1)),
+        altitudeAvg: Number(altitudeAvg.toFixed(0)),
+        altitudeMax: Number(altitudeMax.toFixed(0)),
+        headingRange: trainingType === "Dogfight" ? "35-335" : "60-295",
+      },
+    };
+  };
+
+  const performanceReview = useMemo<PerformanceReview | null>(() => {
+    if (!debrief || selectedPilotObjects.length === 0) {
+      return null;
+    }
+
+    const peakG = debrief.peakG ?? 2;
+    const peakStress = debrief.peakStress ?? 20;
+    const peakHeartRate = debrief.peakHeartRate ?? 95;
+    const peakFatigue = debrief.peakFatigue ?? 18;
+
+    const pilotBreakdown = selectedPilotObjects.map((pilot, index) => {
+      const skillFactor = getSkillFactor(pilot.skillLevel);
+      const stabilityPenalty = Math.max(0, peakG - 2.5) * 10 + peakStress * 0.16 + Math.max(0, peakHeartRate - 125) * 0.2 + peakFatigue * 0.11;
+      const profileOffset = ((pilot.id + index) % 5) - 2;
+      const score = Math.round(clamp(84 + (skillFactor - 1) * 26 - stabilityPenalty + profileOffset, 35, 99));
+      return {
+        pilotId: pilot.id,
+        callSign: pilot.callSign,
+        score,
+        grade: gradeFromScore(score),
+      };
+    });
+
+    const score = Math.round(pilotBreakdown.reduce((sum, item) => sum + item.score, 0) / pilotBreakdown.length);
+    const grade = gradeFromScore(score);
+
+    if (grade === "EXCELLENT") {
+      return {
+        score,
+        grade,
+        summary: "Pilot team maintained stable control with efficient maneuver execution.",
+        recommendations: ["Proceed to post-training aircraft check.", "Schedule normal recovery window."],
+        pilotBreakdown,
+      };
+    }
+
+    if (grade === "GOOD") {
+      return {
+        score,
+        grade,
+        summary: "Mission profile completed with minor strain indicators.",
+        recommendations: ["Run full airframe post-check.", "Monitor hydration and fatigue in medical step."],
+        pilotBreakdown,
+      };
+    }
+
+    if (grade === "FAIR") {
+      return {
+        score,
+        grade,
+        summary: "Pilot completed the sortie but showed notable physiological load.",
+        recommendations: ["Inspect aircraft stress points before next sortie.", "Recommend recovery protocol and follow-up medical checks."],
+        pilotBreakdown,
+      };
+    }
+
+    return {
+      score,
+      grade,
+      summary: "Pilot performance degraded under load and requires corrective training.",
+      recommendations: ["Escalate aircraft and systems inspection scope.", "Mark pilot for enhanced medical review before redeployment."],
+      pilotBreakdown,
+    };
+  }, [debrief, selectedPilotObjects]);
 
   const selectedAircraftIds = useMemo(() => {
     const mapped = selectedPilotObjects.map((pilot) => pilot.assignedAircraft).filter(Boolean) as string[];
@@ -159,7 +373,7 @@ const Training = () => {
 
   useEffect(() => {
     setDebrief(null);
-  }, [trainingType, selectedPilots, duration, notes]);
+  }, [trainingType, selectedPilots]);
 
   useEffect(() => {
     setCompletionDebrief(null);
@@ -254,6 +468,10 @@ const Training = () => {
       window.alert("Run Step 2 training execution before completing the workflow.");
       return;
     }
+    if (!performanceReview) {
+      window.alert("Open Step 3 debrief review before completing the workflow.");
+      return;
+    }
 
     setRunning(true);
     try {
@@ -293,7 +511,7 @@ const Training = () => {
     }
   };
 
-  const startTrainingExecution = async () => {
+  const startTrainingExecution = () => {
     if (!selectedPilots.length) {
       window.alert("Select pilot(s) in Step 1 first.");
       return;
@@ -303,18 +521,15 @@ const Training = () => {
       return;
     }
 
-    setTrainingRunning(true);
-    try {
-      await new Promise((resolve) => window.setTimeout(resolve, 1600));
-      setDebrief({
+    navigate("/training/simulator", {
+      state: {
+        selectedPilotIds: selectedPilots,
+        selectedAircraftIds,
         duration,
-        outcome: "Completed",
-        notes: notes.trim() || `${trainingType} training completed for ${selectedPilots.length} pilot(s).`,
-      });
-      setStep(3);
-    } finally {
-      setTrainingRunning(false);
-    }
+        notes,
+        trainingType,
+      },
+    });
   };
 
   const step0Complete = true;
@@ -324,7 +539,8 @@ const Training = () => {
     && selectedAircraftIds.every((aircraftId) => !!preCheckByAircraft[aircraftId])
     && selectedPilots.every((pilotId) => !!pilotPreInspectionByPilot[pilotId]);
   const step2Complete = !!debrief;
-  const step3Complete = step2Complete && selectedAircraftIds.every((aircraftId) => !!postCheckByAircraft[aircraftId]);
+  const step3Complete = !!performanceReview;
+  const step4Complete = step3Complete && selectedAircraftIds.every((aircraftId) => !!postCheckByAircraft[aircraftId]);
 
   const maxUnlockedStep = useMemo(() => {
     let unlocked = 0;
@@ -332,8 +548,9 @@ const Training = () => {
     if (step1Complete) unlocked = 2;
     if (step2Complete) unlocked = 3;
     if (step3Complete) unlocked = 4;
+    if (step4Complete) unlocked = 5;
     return unlocked;
-  }, [step0Complete, step1Complete, step2Complete, step3Complete]);
+  }, [step0Complete, step1Complete, step2Complete, step3Complete, step4Complete]);
 
   const goToStep = (nextStep: number) => {
     if (nextStep <= maxUnlockedStep) {
@@ -344,9 +561,28 @@ const Training = () => {
   };
 
   const goNext = () => {
-    const target = Math.min(4, step + 1);
+    if (step === 2 && !debrief) {
+      const autoDebrief = generatePlannedDebrief();
+      if (!autoDebrief) {
+        window.alert("Select pilot(s) in Step 1 before creating a debrief.");
+        return;
+      }
+      setDebrief(autoDebrief);
+      setStep(3);
+      return;
+    }
+    const target = Math.min(5, step + 1);
     goToStep(target);
   };
+
+  const stepLabels = [
+    "STEP 0 - TYPE",
+    "STEP 1 - PRE-CHECK",
+    "STEP 2 - EXECUTION",
+    "STEP 3 - DEBRIEF",
+    "STEP 4 - AIRCRAFT CHECK",
+    "STEP 5 - MEDICAL",
+  ];
 
   if (role !== "ADMIN_COMMANDER" && role !== "PILOT") {
     return (
@@ -365,14 +601,14 @@ const Training = () => {
           <h2 className="font-orbitron text-sm text-primary">STEP-BASED TRAINING FLOW</h2>
 
           <div className="flex flex-wrap gap-2 border border-border/30 bg-background/20 p-2">
-            {[0, 1, 2, 3, 4].map((index) => (
+            {stepLabels.map((label, index) => (
               <button
                 key={index}
                 type="button"
                 onClick={() => goToStep(index)}
                 className={`px-3 py-1 font-orbitron text-[0.65rem] ${step === index ? "border border-primary text-primary" : "border border-border/40 text-muted-foreground"}`}
               >
-                STEP {index}
+                {label}
               </button>
             ))}
           </div>
@@ -441,29 +677,23 @@ const Training = () => {
                 return (
                   <div key={aircraftId} className="grid grid-cols-1 gap-2 border border-border/30 bg-background/20 p-3 md:grid-cols-2">
                     <p className="md:col-span-2 text-xs text-primary">Aircraft {aircraftId}</p>
-                    <label className="text-xs text-muted-foreground">Fuel Level
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.fuelLevel} onChange={(e) => updatePreCheck(aircraftId, { fuelLevel: e.target.value as FuelLevel })}><option>OK</option><option>LOW</option><option>CRITICAL</option></select>
-                    </label>
                     <label className="text-xs text-muted-foreground">Engine Status
                       <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.engineStatus} onChange={(e) => updatePreCheck(aircraftId, { engineStatus: e.target.value as SystemStatus })}><option>OK</option><option>ISSUE</option></select>
                     </label>
-                    <label className="text-xs text-muted-foreground">Avionics Check
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.avionicsCheck} onChange={(e) => updatePreCheck(aircraftId, { avionicsCheck: e.target.value as SystemStatus })}><option>OK</option><option>ISSUE</option></select>
+                    <label className="text-xs text-muted-foreground">Wings Status
+                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.wingsStatus} onChange={(e) => updatePreCheck(aircraftId, { wingsStatus: e.target.value as WingsStatus })}><option>OK</option><option>DAMAGE</option></select>
                     </label>
-                    <label className="text-xs text-muted-foreground">Weapon Systems
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.weaponSystems} onChange={(e) => updatePreCheck(aircraftId, { weaponSystems: e.target.value as WeaponSystems })}><option>OK</option><option>NOT REQUIRED</option></select>
+                    <label className="text-xs text-muted-foreground">Landing Gear Status
+                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.landingGearStatus} onChange={(e) => updatePreCheck(aircraftId, { landingGearStatus: e.target.value as SystemStatus })}><option>OK</option><option>ISSUE</option></select>
+                    </label>
+                    <label className="text-xs text-muted-foreground">Avionics Status
+                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.avionicsStatus} onChange={(e) => updatePreCheck(aircraftId, { avionicsStatus: e.target.value as SystemStatus })}><option>OK</option><option>ISSUE</option></select>
+                    </label>
+                    <label className="text-xs text-muted-foreground">Fuel System Status
+                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.fuelSystemStatus} onChange={(e) => updatePreCheck(aircraftId, { fuelSystemStatus: e.target.value as FuelSystemStatus })}><option>OK</option><option>LOW</option><option>CRITICAL</option><option>ISSUE</option></select>
                     </label>
                     <label className="md:col-span-2 text-xs text-muted-foreground">Overall Status
                       <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.overallStatus} onChange={(e) => updatePreCheck(aircraftId, { overallStatus: e.target.value as OverallStatus })}><option>READY</option><option>NOT READY</option></select>
-                    </label>
-                    <label className="text-xs text-muted-foreground">Hydraulic Pressure
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.hydraulicPressure} onChange={(e) => updatePreCheck(aircraftId, { hydraulicPressure: e.target.value as CheckValue })}><option>NORMAL</option><option>LOW</option></select>
-                    </label>
-                    <label className="text-xs text-muted-foreground">Navigation Systems
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.navSystems} onChange={(e) => updatePreCheck(aircraftId, { navSystems: e.target.value as SystemStatus })}><option>OK</option><option>ISSUE</option></select>
-                    </label>
-                    <label className="md:col-span-2 text-xs text-muted-foreground">Tire Condition
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.tireCondition} onChange={(e) => updatePreCheck(aircraftId, { tireCondition: e.target.value as TireCondition })}><option>GOOD</option><option>WEAR</option></select>
                     </label>
                   </div>
                 );
@@ -486,25 +716,39 @@ const Training = () => {
               <p className="font-rajdhani text-xs text-muted-foreground">Pilots and aircraft are auto-selected from Step 1.</p>
 
               <div className="border border-border/30 bg-background/20 p-3">
-                <button
-                  type="button"
-                  onClick={startTrainingExecution}
-                  disabled={trainingRunning}
-                  className="border border-primary px-4 py-2 font-orbitron text-xs text-primary"
-                >
-                  {trainingRunning ? "STARTING TRAINING..." : "START TRAINING"}
-                </button>
-
-                {trainingRunning && (
-                  <p className="mt-2 font-rajdhani text-sm text-muted-foreground">Training simulation in progress...</p>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={startTrainingExecution}
+                    className="border border-primary px-4 py-2 font-orbitron text-xs text-primary"
+                  >
+                    START TRAINING
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const autoDebrief = generatePlannedDebrief();
+                      if (!autoDebrief) {
+                        window.alert("Select pilot(s) in Step 1 before using auto route debrief.");
+                        return;
+                      }
+                      setDebrief(autoDebrief);
+                      setStep(3);
+                    }}
+                    className="border border-border px-4 py-2 font-orbitron text-xs text-muted-foreground"
+                  >
+                    SKIP SIMULATOR (AUTO ROUTE)
+                  </button>
+                </div>
 
                 {debrief && (
                   <div className="mt-3 space-y-1">
                     <p className="font-rajdhani text-sm text-primary">Debrief Summary</p>
                     <p className="font-rajdhani text-xs text-muted-foreground">Duration: {debrief.duration}</p>
                     <p className="font-rajdhani text-xs text-muted-foreground">Outcome: {debrief.outcome}</p>
+                    <p className="font-rajdhani text-xs text-muted-foreground">Source: {debrief.source === "planned" ? "Auto Planned Route" : "Simulator Run"}</p>
                     <p className="font-rajdhani text-xs text-muted-foreground">Notes: {debrief.notes}</p>
+                    <p className="font-rajdhani text-xs text-muted-foreground">Proceed to Step 3 for pilot performance review.</p>
                   </div>
                 )}
               </div>
@@ -513,23 +757,89 @@ const Training = () => {
 
           {step === 3 && (
             <div className="space-y-3">
-              <p className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">STEP 3 - POST-TRAINING AIRCRAFT CHECK</p>
+              <p className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">STEP 3 - POST-TRAINING DEBRIEF</p>
+              {!debrief && <p className="text-xs text-muted-foreground">Run Step 2 first to generate debrief data.</p>}
+              {debrief && performanceReview && (
+                <div className="space-y-2 border border-border/30 bg-background/20 p-3">
+                  <p className="font-orbitron text-xs tracking-[0.14em] text-primary">PILOT PERFORMANCE REVIEW</p>
+                  <p className="font-rajdhani text-xs text-muted-foreground">Debrief Source: {debrief.source === "planned" ? "Auto Planned Route" : "Simulator Run"}</p>
+                  <p className="font-rajdhani text-xs text-muted-foreground">Duration: {debrief.duration}</p>
+                  <p className="font-rajdhani text-xs text-muted-foreground">Performance Score: {performanceReview.score}/100</p>
+                  <p className="font-rajdhani text-xs text-muted-foreground">Grade: {performanceReview.grade}</p>
+                  <p className="font-rajdhani text-xs text-muted-foreground">Peak G: {(debrief.peakG ?? 0).toFixed(2)} g</p>
+                  <p className="font-rajdhani text-xs text-muted-foreground">Peak Stress: {(debrief.peakStress ?? 0).toFixed(0)}%</p>
+                  <p className="font-rajdhani text-xs text-muted-foreground">Peak Heart Rate: {(debrief.peakHeartRate ?? 0).toFixed(0)} bpm</p>
+                  <p className="font-rajdhani text-xs text-muted-foreground">Peak Fatigue: {(debrief.peakFatigue ?? 0).toFixed(0)}%</p>
+                  {debrief.telemetrySummary && (
+                    <div className="border border-border/30 bg-background/30 p-2">
+                      <p className="mb-1 text-[0.65rem] text-muted-foreground">Telemetry Summary</p>
+                      <p className="text-xs text-muted-foreground">Speed: {debrief.telemetrySummary.speedMin ?? 0} - {debrief.telemetrySummary.speedMax ?? 0} kts (avg {debrief.telemetrySummary.speedAvg ?? 0})</p>
+                      <p className="text-xs text-muted-foreground">Altitude: avg {debrief.telemetrySummary.altitudeAvg ?? 0} m, peak {debrief.telemetrySummary.altitudeMax ?? 0} m</p>
+                      <p className="text-xs text-muted-foreground">Heading Range: {debrief.telemetrySummary.headingRange || "N/A"}</p>
+                    </div>
+                  )}
+
+                  <div className="border border-border/30 bg-background/30 p-2">
+                    <p className="mb-1 text-[0.65rem] text-muted-foreground">Pilot Scores</p>
+                    {performanceReview.pilotBreakdown.map((item) => (
+                      <p key={item.pilotId} className="text-xs text-muted-foreground">
+                        <span className="text-primary">{item.callSign}</span>: {item.score}/100 ({item.grade})
+                      </p>
+                    ))}
+                  </div>
+
+                  {Array.isArray(debrief.plannedPath) && debrief.plannedPath.length > 0 && (
+                    <div className="border border-border/30 bg-background/30 p-2">
+                      <p className="mb-1 text-[0.65rem] text-muted-foreground">Planned Route</p>
+                      {debrief.plannedPath.map((pathStep, index) => (
+                        <p key={`${pathStep}-${index}`} className="text-xs text-muted-foreground">{index + 1}. {pathStep}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {Array.isArray(debrief.actionSummary) && debrief.actionSummary.length > 0 && (
+                    <div className="border border-border/30 bg-background/30 p-2">
+                      <p className="mb-1 text-[0.65rem] text-muted-foreground">Flight Actions</p>
+                      {debrief.actionSummary.slice(0, 8).map((item, index) => (
+                        <p key={`${item}-${index}`} className="text-xs text-muted-foreground">{item}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="font-rajdhani text-xs text-muted-foreground">Assessment: {performanceReview.summary}</p>
+                  <div className="border border-border/30 bg-background/30 p-2">
+                    <p className="mb-1 text-[0.65rem] text-muted-foreground">Recommendations</p>
+                    {performanceReview.recommendations.map((item) => (
+                      <p key={item} className="text-xs text-muted-foreground">- {item}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-3">
+              <p className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">STEP 4 - POST-TRAINING AIRCRAFT CHECK</p>
               {selectedAircraftIds.map((aircraftId) => {
                 const check = postCheckByAircraft[aircraftId] || postCheckDefaults;
                 return (
                   <div key={aircraftId} className="grid grid-cols-1 gap-2 border border-border/30 bg-background/20 p-3 md:grid-cols-2">
                     <p className="md:col-span-2 text-xs text-primary">Aircraft {aircraftId}</p>
-                    <label className="text-xs text-muted-foreground">Fuel Level
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.fuelLevel} onChange={(e) => updatePostCheck(aircraftId, { fuelLevel: e.target.value as FuelLevel })}><option>OK</option><option>LOW</option><option>CRITICAL</option></select>
-                    </label>
                     <label className="text-xs text-muted-foreground">Engine Status
                       <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.engineStatus} onChange={(e) => updatePostCheck(aircraftId, { engineStatus: e.target.value as SystemStatus })}><option>OK</option><option>ISSUE</option></select>
                     </label>
-                    <label className="text-xs text-muted-foreground">Avionics Check
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.avionicsCheck} onChange={(e) => updatePostCheck(aircraftId, { avionicsCheck: e.target.value as SystemStatus })}><option>OK</option><option>ISSUE</option></select>
+                    <label className="text-xs text-muted-foreground">Wings Status
+                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.wingsStatus} onChange={(e) => updatePostCheck(aircraftId, { wingsStatus: e.target.value as WingsStatus })}><option>OK</option><option>DAMAGE</option></select>
                     </label>
-                    <label className="text-xs text-muted-foreground">Weapon Systems
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.weaponSystems} onChange={(e) => updatePostCheck(aircraftId, { weaponSystems: e.target.value as WeaponSystems })}><option>OK</option><option>NOT REQUIRED</option></select>
+                    <label className="text-xs text-muted-foreground">Landing Gear Status
+                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.landingGearStatus} onChange={(e) => updatePostCheck(aircraftId, { landingGearStatus: e.target.value as SystemStatus })}><option>OK</option><option>ISSUE</option></select>
+                    </label>
+                    <label className="text-xs text-muted-foreground">Avionics Status
+                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.avionicsStatus} onChange={(e) => updatePostCheck(aircraftId, { avionicsStatus: e.target.value as SystemStatus })}><option>OK</option><option>ISSUE</option></select>
+                    </label>
+                    <label className="text-xs text-muted-foreground">Fuel System Status
+                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.fuelSystemStatus} onChange={(e) => updatePostCheck(aircraftId, { fuelSystemStatus: e.target.value as FuelSystemStatus })}><option>OK</option><option>LOW</option><option>CRITICAL</option><option>ISSUE</option></select>
                     </label>
                     <label className="text-xs text-muted-foreground">Overall Status
                       <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.overallStatus} onChange={(e) => updatePostCheck(aircraftId, { overallStatus: e.target.value as OverallStatus })}><option>READY</option><option>NOT READY</option></select>
@@ -540,23 +850,17 @@ const Training = () => {
                     <label className="md:col-span-2 text-xs text-muted-foreground">Maintenance Required
                       <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.maintenanceRequired} onChange={(e) => updatePostCheck(aircraftId, { maintenanceRequired: e.target.value as YesNo })}><option>NO</option><option>YES</option></select>
                     </label>
-                    <label className="text-xs text-muted-foreground">Fluid Leak Detected
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.fluidLeakDetected} onChange={(e) => updatePostCheck(aircraftId, { fluidLeakDetected: e.target.value as YesNo })}><option>NO</option><option>YES</option></select>
-                    </label>
-                    <label className="text-xs text-muted-foreground">Bird Strike Signs
-                      <select className="mt-1 w-full border border-border bg-background/40 px-2 py-1" value={check.birdStrikeSigns} onChange={(e) => updatePostCheck(aircraftId, { birdStrikeSigns: e.target.value as YesNo })}><option>NO</option><option>YES</option></select>
-                    </label>
                   </div>
                 );
               })}
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div>
-              <p className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">STEP 4 - PILOT MEDICAL REPORT (BODY MAP)</p>
+              <p className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">STEP 5 - PILOT MEDICAL REPORT (BODY MAP)</p>
               <div className="space-y-3">
-                {selectedPilots.length === 0 && <p className="text-xs text-muted-foreground">Select pilots in Step 2 first.</p>}
+                {selectedPilots.length === 0 && <p className="text-xs text-muted-foreground">Select pilots in Step 1 first.</p>}
                 {selectedPilots.map((pilotId) => {
                   const pilot = pilotOptions.find((row) => row.id === pilotId);
                   const medical = medicalByPilot[pilotId];
@@ -612,7 +916,7 @@ const Training = () => {
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => setStep((prev) => Math.max(0, prev - 1))} className="border border-border px-4 py-2 font-orbitron text-xs text-muted-foreground">PREV</button>
             <button type="button" onClick={goNext} className="border border-border px-4 py-2 font-orbitron text-xs text-muted-foreground">NEXT</button>
-            <button type="submit" disabled={running || step < 4} className="border border-primary px-4 py-2 font-orbitron text-xs text-primary">
+            <button type="submit" disabled={running || step < 5} className="border border-primary px-4 py-2 font-orbitron text-xs text-primary">
               {running ? "PROCESSING TRAINING..." : "COMPLETE TRAINING"}
             </button>
           </div>

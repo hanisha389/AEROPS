@@ -10,6 +10,7 @@ import PilotInfo from "./pages/PilotInfo";
 import EngineerInfo from "./pages/EngineerInfo";
 import AircraftInfo from "./pages/AircraftInfo";
 import Training from "./pages/Training";
+import TrainingSimulator from "./pages/TrainingSimulator";
 import Simulation from "./pages/Simulation";
 import SimulationRun from "./pages/SimulationRun";
 import NotFound from "./pages/NotFound";
@@ -54,6 +55,7 @@ const App = () => (
           <Route path="/aircraft" element={<ProtectedRoute routeKey="/aircraft"><AircraftInfo /></ProtectedRoute>} />
           <Route path="/aircraft/:id" element={<ProtectedRoute routeKey="/aircraft/:id"><AircraftDetail /></ProtectedRoute>} />
           <Route path="/training" element={<ProtectedRoute routeKey="/training"><Training /></ProtectedRoute>} />
+          <Route path="/training/simulator" element={<ProtectedRoute routeKey="/training/simulator"><TrainingSimulator /></ProtectedRoute>} />
           <Route path="/simulation" element={<ProtectedRoute routeKey="/simulation"><Simulation /></ProtectedRoute>} />
           <Route path="/simulation/run" element={<ProtectedRoute routeKey="/simulation/run"><SimulationRun /></ProtectedRoute>} />
           <Route path="/documents" element={<ProtectedRoute routeKey="/documents"><Documents /></ProtectedRoute>} />

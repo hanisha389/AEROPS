@@ -115,8 +115,11 @@ def get_aircraft_maintenance_history(
     allowed_log_types = [
         "PRE_FLIGHT_INSPECTION",
         "POST_FLIGHT_INSPECTION",
+        "ENGINEER_ASSIGNMENT",
         "ENGINEER_TASK_COMPLETION",
         "MAINTENANCE_COMPLETION",
+        "MAINTENANCE_ENTRY",
+        "TRAINING_CRITICAL_ALERT",
     ]
     rows = (
         db.query(AircraftMaintenanceLog)

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Circle, CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMapEvents } from "react-leaflet";
+import { Circle, CircleMarker, MapContainer, Polygon, Polyline, TileLayer, Tooltip, useMapEvents } from "react-leaflet";
 import BackgroundLayout from "@/components/BackgroundLayout";
 import PageHeader from "@/components/PageHeader";
 import {
@@ -7,13 +7,12 @@ import {
   type AirspaceZone,
   type MapCoordinate,
   type EnemyAircraftUnitPayload,
-  type SimulationRunResponse,
 } from "@/lib/api";
 import "leaflet/dist/leaflet.css";
 import { useNavigate } from "react-router-dom";
 
 type SidebarMode = "airspace" | "target" | "team" | "simulation";
-type MapMode = "idle" | "set_base" | "airspace" | "route_start" | "route_waypoint" | "route_end" | "ground_target" | "aircraft_waypoint";
+type MapMode = "idle" | "set_base" | "airspace_vertex" | "route_start" | "route_waypoint" | "route_end" | "ground_target" | "aircraft_waypoint";
 type MissionType = "water" | "air" | "ground";
 type WaterTargetType = "cargo_ship" | "warship" | "submarine";
 type ZoneType = "friendly" | "neutral" | "enemy";
@@ -23,6 +22,25 @@ interface PilotOption {
   name: string;
   callSign: string;
   assignedAircraft?: string | null;
+}
+
+interface AircraftCatalogItem {
+  id: string;
+  model?: string;
+  name?: string;
+}
+
+interface WeaponSpec {
+  weight: number;
+}
+
+interface AircraftProfile {
+  name: string;
+  maxSpeed: number;
+  maxRange: number;
+  baseWeight: number;
+  maxTakeoffWeight: number;
+  ordnanceLimit: number;
 }
 
 const WATER_TARGET_SPEEDS: Record<WaterTargetType, number> = {
@@ -45,6 +63,65 @@ const MISSION_LABELS: Record<MissionType, string> = {
 
 const ENEMY_AIRCRAFT_TYPES = ["F-16", "F-18", "F-22", "Su-30", "Rafale", "AWACS"];
 const WEAPON_TYPES = ["AAM", "ASM", "Precision Bomb", "Torpedo", "ECM Pod"];
+const WEAPON_SPECS: Record<string, WeaponSpec> = {
+  AAM: { weight: 90 },
+  ASM: { weight: 240 },
+  "Precision Bomb": { weight: 520 },
+  Torpedo: { weight: 380 },
+  "ECM Pod": { weight: 180 },
+};
+
+const AIRCRAFT_PROFILES: Record<string, AircraftProfile> = {
+  "F-22": {
+    name: "F-22 Raptor",
+    maxSpeed: 2410,
+    maxRange: 2960,
+    baseWeight: 19700,
+    maxTakeoffWeight: 38000,
+    ordnanceLimit: 1900,
+  },
+  "F-35": {
+    name: "F-35 Lightning II",
+    maxSpeed: 1930,
+    maxRange: 2200,
+    baseWeight: 13150,
+    maxTakeoffWeight: 31750,
+    ordnanceLimit: 1700,
+  },
+  "SU-30": {
+    name: "Su-30MKI",
+    maxSpeed: 2120,
+    maxRange: 3000,
+    baseWeight: 18400,
+    maxTakeoffWeight: 38800,
+    ordnanceLimit: 2200,
+  },
+  RAFALE: {
+    name: "Rafale",
+    maxSpeed: 1910,
+    maxRange: 3700,
+    baseWeight: 10100,
+    maxTakeoffWeight: 24500,
+    ordnanceLimit: 2000,
+  },
+  "F/A-18": {
+    name: "F/A-18 Super Hornet",
+    maxSpeed: 1915,
+    maxRange: 2340,
+    baseWeight: 14600,
+    maxTakeoffWeight: 29900,
+    ordnanceLimit: 1800,
+  },
+  DEFAULT: {
+    name: "Generic Fighter",
+    maxSpeed: 1500,
+    maxRange: 1800,
+    baseWeight: 14000,
+    maxTakeoffWeight: 28000,
+    ordnanceLimit: 1400,
+  },
+};
+
 const ZONE_COLORS: Record<ZoneType, { stroke: string; fill: string; label: string }> = {
   friendly: { stroke: "#22c55e", fill: "#22c55e", label: "Friendly" },
   neutral: { stroke: "#eab308", fill: "#eab308", label: "Neutral" },
@@ -54,6 +131,98 @@ const ZONE_COLORS: Record<ZoneType, { stroke: string; fill: string; label: strin
 const toPositions = (points: MapCoordinate[]) => points.map((point) => [point.lat, point.lng] as [number, number]);
 
 const formatCoord = (point: MapCoordinate) => `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`;
+
+const toRadians = (value: number) => (value * Math.PI) / 180;
+const toDegrees = (value: number) => (value * 180) / Math.PI;
+
+const greatCirclePoint = (start: MapCoordinate, end: MapCoordinate, ratio: number): MapCoordinate => {
+  if (ratio <= 0) {
+    return start;
+  }
+  if (ratio >= 1) {
+    return end;
+  }
+
+  const lat1 = toRadians(start.lat);
+  const lon1 = toRadians(start.lng);
+  const lat2 = toRadians(end.lat);
+  const lon2 = toRadians(end.lng);
+
+  const x1 = Math.cos(lat1) * Math.cos(lon1);
+  const y1 = Math.cos(lat1) * Math.sin(lon1);
+  const z1 = Math.sin(lat1);
+
+  const x2 = Math.cos(lat2) * Math.cos(lon2);
+  const y2 = Math.cos(lat2) * Math.sin(lon2);
+  const z2 = Math.sin(lat2);
+
+  const dot = Math.min(1, Math.max(-1, x1 * x2 + y1 * y2 + z1 * z2));
+  const omega = Math.acos(dot);
+  if (Math.abs(omega) < 1e-10) {
+    return {
+      lat: start.lat + (end.lat - start.lat) * ratio,
+      lng: start.lng + (end.lng - start.lng) * ratio,
+    };
+  }
+
+  const sinOmega = Math.sin(omega);
+  const w1 = Math.sin((1 - ratio) * omega) / sinOmega;
+  const w2 = Math.sin(ratio * omega) / sinOmega;
+
+  let x = w1 * x1 + w2 * x2;
+  let y = w1 * y1 + w2 * y2;
+  let z = w1 * z1 + w2 * z2;
+  const norm = Math.sqrt(x * x + y * y + z * z);
+  x /= norm;
+  y /= norm;
+  z /= norm;
+
+  return {
+    lat: toDegrees(Math.atan2(z, Math.sqrt(x * x + y * y))),
+    lng: toDegrees(Math.atan2(y, x)),
+  };
+};
+
+const geodesicInterpolatePath = (points: MapCoordinate[], segmentsPerLeg = 24): MapCoordinate[] => {
+  if (points.length < 2) {
+    return points;
+  }
+  const curved: MapCoordinate[] = [points[0]];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const start = points[i];
+    const end = points[i + 1];
+    for (let step = 1; step <= segmentsPerLeg; step += 1) {
+      curved.push(greatCirclePoint(start, end, step / segmentsPerLeg));
+    }
+  }
+  return curved;
+};
+
+const resolveAircraftProfile = (modelName?: string | null): AircraftProfile => {
+  const model = (modelName || "").toUpperCase();
+  if (model.includes("F-22")) {
+    return AIRCRAFT_PROFILES["F-22"];
+  }
+  if (model.includes("F-35")) {
+    return AIRCRAFT_PROFILES["F-35"];
+  }
+  if (model.includes("SU-30")) {
+    return AIRCRAFT_PROFILES["SU-30"];
+  }
+  if (model.includes("RAFALE")) {
+    return AIRCRAFT_PROFILES.RAFALE;
+  }
+  if (model.includes("F/A-18") || model.includes("FA-18")) {
+    return AIRCRAFT_PROFILES["F/A-18"];
+  }
+  return AIRCRAFT_PROFILES.DEFAULT;
+};
+
+const computePayloadWeightKg = (weaponMap: Record<string, number>) =>
+  Object.entries(weaponMap).reduce((sum, [weaponType, quantity]) => {
+    const weaponWeight = WEAPON_SPECS[weaponType]?.weight ?? 0;
+    return sum + weaponWeight * quantity;
+  }, 0);
 
 const ClickHandler = ({ onClick }: { onClick: (point: MapCoordinate) => void }) => {
   useMapEvents({
@@ -72,8 +241,7 @@ const Simulation = () => {
   const [baseLocation, setBaseLocation] = useState<MapCoordinate | null>(null);
   const [airspaceCountry, setAirspaceCountry] = useState("");
   const [airspaceZoneType, setAirspaceZoneType] = useState<ZoneType>("neutral");
-  const [airspaceRadiusKm, setAirspaceRadiusKm] = useState(120);
-  const [airspaceDraftCenter, setAirspaceDraftCenter] = useState<MapCoordinate | null>(null);
+  const [airspaceDraftPolygon, setAirspaceDraftPolygon] = useState<MapCoordinate[]>([]);
 
   const [missionType, setMissionType] = useState<MissionType>("water");
   const [waterTargetType, setWaterTargetType] = useState<WaterTargetType>("cargo_ship");
@@ -88,6 +256,7 @@ const Simulation = () => {
   const [aircraftRouteWaypoints, setAircraftRouteWaypoints] = useState<MapCoordinate[]>([]);
 
   const [pilotOptions, setPilotOptions] = useState<PilotOption[]>([]);
+  const [aircraftCatalog, setAircraftCatalog] = useState<Record<string, AircraftCatalogItem>>({});
   const [selectedPilotIds, setSelectedPilotIds] = useState<number[]>([]);
   const [weaponByAircraft, setWeaponByAircraft] = useState<Record<string, Record<string, number>>>({});
 
@@ -144,8 +313,18 @@ const Simulation = () => {
     if (missionType === "ground") {
       return groundTargetLocation ? [groundTargetLocation] : [];
     }
-    return routeCoordinates;
+    return geodesicInterpolatePath(routeCoordinates);
   }, [missionType, groundTargetLocation, routeCoordinates]);
+
+  const draftAirspacePath = useMemo(() => {
+    if (!airspaceDraftPolygon.length) {
+      return [];
+    }
+    if (airspaceDraftPolygon.length === 1) {
+      return airspaceDraftPolygon;
+    }
+    return [...airspaceDraftPolygon, airspaceDraftPolygon[0]];
+  }, [airspaceDraftPolygon]);
 
   useEffect(() => {
     api.getAirspaceZones().then(setZones);
@@ -159,6 +338,13 @@ const Simulation = () => {
           assignedAircraft: pilot.assignedAircraft,
         })),
       );
+    });
+    api.getAircrafts().then((aircraftList) => {
+      const next: Record<string, AircraftCatalogItem> = {};
+      (aircraftList || []).forEach((item: AircraftCatalogItem) => {
+        next[item.id] = item;
+      });
+      setAircraftCatalog(next);
     });
   }, []);
 
@@ -178,8 +364,8 @@ const Simulation = () => {
       setMapMode("idle");
       return;
     }
-    if (mapMode === "airspace") {
-      setAirspaceDraftCenter(point);
+    if (mapMode === "airspace_vertex") {
+      setAirspaceDraftPolygon((prev) => [...prev, point]);
       return;
     }
     if (mapMode === "route_start") {
@@ -206,8 +392,8 @@ const Simulation = () => {
   };
 
   const saveAirspace = async () => {
-    if (!airspaceDraftCenter) {
-      window.alert("Click on the map to place airspace center first.");
+    if (airspaceDraftPolygon.length < 3) {
+      window.alert("Draw at least 3 polygon points for airspace.");
       return;
     }
     if (!airspaceCountry.trim()) {
@@ -217,13 +403,17 @@ const Simulation = () => {
 
     const created = await api.createAirspaceZone({
       countryName: airspaceCountry.trim(),
-      center: airspaceDraftCenter,
-      radiusKm: airspaceRadiusKm,
+      polygon: airspaceDraftPolygon,
       zoneType: airspaceZoneType,
     });
     setZones((prev) => [...prev, created]);
     setAirspaceCountry("");
-    setAirspaceDraftCenter(null);
+    setAirspaceDraftPolygon([]);
+    setMapMode("idle");
+  };
+
+  const undoDraftAirspacePoint = () => {
+    setAirspaceDraftPolygon((prev) => prev.slice(0, -1));
   };
 
   const togglePilot = (pilotId: number) => {
@@ -248,6 +438,16 @@ const Simulation = () => {
       const total = Object.values(aircraftMap).reduce((sum, qty) => sum + qty, 0);
       if (total > 5) {
         window.alert(`Aircraft ${aircraftId} can carry maximum 5 weapon units.`);
+        return prev;
+      }
+
+       const aircraftModel = aircraftCatalog[aircraftId]?.model || aircraftCatalog[aircraftId]?.name;
+      const profile = resolveAircraftProfile(aircraftModel);
+      const payloadWeightKg = computePayloadWeightKg(aircraftMap);
+      if (payloadWeightKg > profile.ordnanceLimit) {
+        window.alert(
+          `${aircraftId} payload exceeds limit (${payloadWeightKg.toFixed(0)}kg / ${profile.ordnanceLimit.toFixed(0)}kg).`,
+        );
         return prev;
       }
 
@@ -307,8 +507,30 @@ const Simulation = () => {
     if (!baseLocation) {
       return [];
     }
-    return [baseLocation, ...aircraftRouteWaypoints];
+    return geodesicInterpolatePath([baseLocation, ...aircraftRouteWaypoints]);
   }, [baseLocation, aircraftRouteWaypoints]);
+
+  const loadoutAnalysis = useMemo(() => {
+    return selectedAircraftIds.map((aircraftId) => {
+      const aircraftModel = aircraftCatalog[aircraftId]?.model || aircraftCatalog[aircraftId]?.name;
+      const profile = resolveAircraftProfile(aircraftModel);
+      const weaponsMap = weaponByAircraft[aircraftId] || {};
+      const payloadWeightKg = computePayloadWeightKg(weaponsMap);
+      const payloadRatio = Math.min(1, payloadWeightKg / Math.max(profile.ordnanceLimit, 1));
+      const effectiveSpeed = profile.maxSpeed * (1 - payloadRatio * 0.35);
+      const effectiveRange = profile.maxRange * (1 - payloadRatio * 0.28);
+      const totalWeightKg = profile.baseWeight + payloadWeightKg;
+      return {
+        aircraftId,
+        profile,
+        payloadWeightKg,
+        totalWeightKg,
+        payloadRatio,
+        effectiveSpeed,
+        effectiveRange,
+      };
+    });
+  }, [selectedAircraftIds, aircraftCatalog, weaponByAircraft]);
 
   const renderModeButton = (mode: SidebarMode, label: string) => (
     <button
@@ -333,30 +555,56 @@ const Simulation = () => {
             <ClickHandler onClick={handleMapClick} />
 
             {zones.map((zone) => (
-              <Circle
-                key={zone.id}
-                center={[zone.center.lat, zone.center.lng]}
-                radius={zone.radiusKm * 1000}
-                pathOptions={{
-                  color: ZONE_COLORS[zone.zoneType].stroke,
-                  fillColor: ZONE_COLORS[zone.zoneType].fill,
-                  fillOpacity: 0.14,
-                  weight: 2,
-                }}
-              >
-                <Tooltip>{`${zone.countryName} (${zone.radiusKm} km, ${ZONE_COLORS[zone.zoneType].label})`}</Tooltip>
-              </Circle>
+              zone.geometryType === "polygon" && zone.polygon.length >= 3 ? (
+                <Polygon
+                  key={zone.id}
+                  positions={toPositions(zone.polygon)}
+                  pathOptions={{
+                    color: ZONE_COLORS[zone.zoneType].stroke,
+                    fillColor: ZONE_COLORS[zone.zoneType].fill,
+                    fillOpacity: 0.14,
+                    weight: 2,
+                  }}
+                >
+                  <Tooltip>{`${zone.countryName} (Polygon, ${ZONE_COLORS[zone.zoneType].label})`}</Tooltip>
+                </Polygon>
+              ) : (
+                zone.center && zone.radiusKm ? (
+                  <Circle
+                    key={zone.id}
+                    center={[zone.center.lat, zone.center.lng]}
+                    radius={zone.radiusKm * 1000}
+                    pathOptions={{
+                      color: ZONE_COLORS[zone.zoneType].stroke,
+                      fillColor: ZONE_COLORS[zone.zoneType].fill,
+                      fillOpacity: 0.14,
+                      weight: 2,
+                    }}
+                  >
+                    <Tooltip>{`${zone.countryName} (${zone.radiusKm} km, ${ZONE_COLORS[zone.zoneType].label})`}</Tooltip>
+                  </Circle>
+                ) : null
+              )
             ))}
 
-            {airspaceDraftCenter && (
-              <Circle
-                center={[airspaceDraftCenter.lat, airspaceDraftCenter.lng]}
-                radius={airspaceRadiusKm * 1000}
+            {airspaceDraftPolygon.length >= 3 && (
+              <Polygon
+                positions={toPositions(airspaceDraftPolygon)}
                 pathOptions={{ color: activeAirspaceColor.stroke, fillColor: activeAirspaceColor.fill, fillOpacity: 0.12, weight: 2, dashArray: "4 6" }}
               >
-                <Tooltip>Draft Airspace</Tooltip>
-              </Circle>
+                <Tooltip>Draft Airspace Polygon</Tooltip>
+              </Polygon>
             )}
+
+            {draftAirspacePath.length > 1 && (
+              <Polyline positions={toPositions(draftAirspacePath)} pathOptions={{ color: activeAirspaceColor.stroke, weight: 2, dashArray: "4 6" }} />
+            )}
+
+            {airspaceDraftPolygon.map((vertex, index) => (
+              <CircleMarker key={`draft-vertex-${index}`} center={[vertex.lat, vertex.lng]} radius={5} pathOptions={{ color: activeAirspaceColor.stroke, fillColor: activeAirspaceColor.fill, fillOpacity: 1 }}>
+                <Tooltip>{`Vertex ${index + 1}`}</Tooltip>
+              </CircleMarker>
+            ))}
 
             {baseLocation && (
               <CircleMarker
@@ -421,7 +669,7 @@ const Simulation = () => {
           {sidebarMode === "airspace" && (
             <div className="space-y-2 border border-border/40 bg-background/20 p-3">
               <p className="font-orbitron text-xs tracking-[0.12em] text-primary">AIRSPACE MODE</p>
-              <button type="button" className="w-full border border-border/50 px-2 py-2 font-rajdhani text-xs" onClick={() => setMapMode("airspace")}>ADD/EDIT AIRSPACE</button>
+              <button type="button" className="w-full border border-border/50 px-2 py-2 font-rajdhani text-xs" onClick={() => setMapMode("airspace_vertex")}>DRAW POLYGON (CLICK MAP)</button>
               <input
                 value={airspaceCountry}
                 onChange={(event) => setAirspaceCountry(event.target.value)}
@@ -440,17 +688,11 @@ const Simulation = () => {
                   <option value="enemy">Red - Enemy</option>
                 </select>
               </label>
-              <label className="block font-rajdhani text-xs text-muted-foreground">
-                Radius (km)
-                <input
-                  type="number"
-                  value={airspaceRadiusKm}
-                  min={10}
-                  max={1000}
-                  onChange={(event) => setAirspaceRadiusKm(Number(event.target.value))}
-                  className="mt-1 w-full border border-border/50 bg-background/60 px-2 py-2 text-sm"
-                />
-              </label>
+              <p className="font-rajdhani text-xs text-muted-foreground">Polygon Points: {airspaceDraftPolygon.length}</p>
+              <div className="flex gap-2">
+                <button type="button" className="w-full border border-border/50 px-2 py-2 font-rajdhani text-xs" onClick={undoDraftAirspacePoint}>UNDO LAST</button>
+                <button type="button" className="w-full border border-border/50 px-2 py-2 font-rajdhani text-xs" onClick={() => setAirspaceDraftPolygon([])}>CLEAR POLYGON</button>
+              </div>
               <button type="button" className="w-full border border-primary px-3 py-2 font-orbitron text-xs text-primary" onClick={saveAirspace}>
                 SAVE ZONE
               </button>
@@ -577,7 +819,7 @@ const Simulation = () => {
               {selectedAircraftIds.map((aircraftId) => (
                 <div key={aircraftId} className="space-y-1 border border-border/40 bg-background/20 p-3">
                   <p className="font-orbitron text-[11px] tracking-[0.1em] text-primary">WEAPONS: {aircraftId}</p>
-                  <p className="font-rajdhani text-xs text-muted-foreground">Capacity: {weaponCountByAircraft[aircraftId] || 0}/5</p>
+                  <p className="font-rajdhani text-xs text-muted-foreground">Capacity: {weaponCountByAircraft[aircraftId] || 0}/5 units</p>
                   {WEAPON_TYPES.map((weaponType) => (
                     <label key={`${aircraftId}-${weaponType}`} className="flex items-center justify-between border border-border/40 px-2 py-1">
                       <span className="font-rajdhani text-sm">{weaponType}</span>
@@ -593,6 +835,21 @@ const Simulation = () => {
                   ))}
                 </div>
               ))}
+
+              {loadoutAnalysis.length > 0 && (
+                <div className="space-y-2 border border-border/40 bg-background/20 p-3">
+                  <p className="font-orbitron text-xs tracking-[0.12em] text-primary">WEIGHT AND FUEL IMPACT</p>
+                  {loadoutAnalysis.map((item) => (
+                    <div key={`loadout-${item.aircraftId}`} className="border border-border/40 px-2 py-2">
+                      <p className="font-rajdhani text-sm text-primary">{item.aircraftId} - {item.profile.name}</p>
+                      <p className="font-rajdhani text-xs text-muted-foreground">Payload: {item.payloadWeightKg.toFixed(0)}kg / {item.profile.ordnanceLimit.toFixed(0)}kg</p>
+                      <p className="font-rajdhani text-xs text-muted-foreground">Final Weight: {item.totalWeightKg.toFixed(0)}kg</p>
+                      <p className="font-rajdhani text-xs text-muted-foreground">Est. Speed After Loadout: {item.effectiveSpeed.toFixed(0)} km/h</p>
+                      <p className="font-rajdhani text-xs text-muted-foreground">Est. Range After Loadout: {item.effectiveRange.toFixed(0)} km</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

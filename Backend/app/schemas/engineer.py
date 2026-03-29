@@ -13,6 +13,7 @@ class EngineerMaintenanceLogBase(BaseModel):
 class EngineerMaintenanceLogRead(EngineerMaintenanceLogBase):
     id: int
     completionStatus: str = "Pending"
+    issueId: Optional[int] = None
 
 
 class EngineerBase(BaseModel):
@@ -35,6 +36,12 @@ class EngineerMaintenanceLogCreate(EngineerMaintenanceLogBase):
 
 class EngineerMaintenanceStatusUpdate(BaseModel):
     completionStatus: str
+
+
+class EngineerIssueAssignmentCreate(BaseModel):
+    issueId: int
+    aircraftId: str
+    engineerId: int
 
 
 class EngineerRead(EngineerBase):

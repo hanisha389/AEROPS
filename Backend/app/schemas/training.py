@@ -20,16 +20,19 @@ class TrainingRunResponse(BaseModel):
 
 
 class AircraftChecklist(BaseModel):
-    fuelLevel: Literal["OK", "LOW", "CRITICAL"]
     engineStatus: Literal["OK", "ISSUE"]
-    avionicsCheck: Literal["OK", "ISSUE"]
-    weaponSystems: Literal["OK", "NOT REQUIRED"]
+    wingsStatus: Literal["OK", "DAMAGE"]
+    landingGearStatus: Literal["OK", "ISSUE"]
+    avionicsStatus: Literal["OK", "ISSUE"]
+    fuelSystemStatus: Literal["OK", "LOW", "CRITICAL", "ISSUE"]
     overallStatus: Literal["READY", "NOT READY"]
 
 
 class PostAircraftChecklist(AircraftChecklist):
     damageObserved: Literal["YES", "NO"]
     maintenanceRequired: Literal["YES", "NO"]
+    fluidLeakDetected: Literal["YES", "NO"] = "NO"
+    birdStrikeSigns: Literal["YES", "NO"] = "NO"
 
 
 class AircraftPreCheck(BaseModel):
