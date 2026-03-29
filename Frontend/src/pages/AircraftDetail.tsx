@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, SyntheticEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import BackgroundLayout from "@/components/BackgroundLayout";
 import PageHeader from "@/components/PageHeader";
@@ -44,6 +44,8 @@ interface Pilot {
   callSign: string;
   name: string;
 }
+
+const normalizeComponentName = (value: string): string => value.toLowerCase().replace(/[\s_-]+/g, "");
 
 const AircraftDetail = () => {
   const { id } = useParams();
@@ -97,6 +99,41 @@ const AircraftDetail = () => {
     }
     return "text-green-400";
   }, [health, selectedPart]);
+
+  const hasEngineDamage = useMemo(() => {
+    const hasEngineIssue = aircraft?.openIssues?.some((issue) => normalizeComponentName(issue.component).includes("engine")) || false;
+    return health.engine !== "Good" || hasEngineIssue;
+  }, [aircraft, health.engine]);
+
+  const hasWingDamage = useMemo(() => {
+    const hasWingIssue = aircraft?.openIssues?.some((issue) => normalizeComponentName(issue.component).includes("wing")) || false;
+    return health.wings !== "Good" || hasWingIssue;
+  }, [aircraft, health.wings]);
+
+  const blueprintImageSrc = useMemo(() => {
+    if (selectedPart === "engine" && hasEngineDamage) {
+      return "/aircraft_engine.svg";
+    }
+    if (selectedPart === "wings" && hasWingDamage) {
+      return "/aircraft_wings.svg";
+    }
+    if (hasEngineDamage) {
+      return "/aircraft_engine.svg";
+    }
+    if (hasWingDamage) {
+      return "/aircraft_wings.svg";
+    }
+    return "/aircraft.svg";
+  }, [hasEngineDamage, hasWingDamage, selectedPart]);
+
+  const handleBlueprintImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget;
+    if (image.dataset.fallbackApplied === "true") {
+      return;
+    }
+    image.dataset.fallbackApplied = "true";
+    image.src = "/aircraft.svg";
+  };
 
   const saveAircraft = async (event: FormEvent) => {
     event.preventDefault();
@@ -167,6 +204,16 @@ const AircraftDetail = () => {
 
         <div className="space-y-4 border border-border/40 bg-card/30 p-4">
           <h3 className="font-orbitron text-xs tracking-[0.18em] text-muted-foreground">2D BLUEPRINT INDICATOR</h3>
+          <div className="border border-border/30 bg-background/20 p-3">
+            <img
+              key={blueprintImageSrc}
+              src={blueprintImageSrc}
+              alt={`${aircraft.name} 2D blueprint indicator`}
+              className="h-auto w-full object-contain"
+              loading="lazy"
+              onError={handleBlueprintImageError}
+            />
+          </div>
           <div className="grid grid-cols-3 gap-2 text-center">
             <button type="button" onClick={() => setSelectedPart("wings")} className="border border-border/30 p-2 font-rajdhani text-xs">Wings</button>
             <button type="button" onClick={() => setSelectedPart("engine")} className="border border-border/30 p-2 font-rajdhani text-xs">Engine</button>
