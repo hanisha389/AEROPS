@@ -1,0 +1,229 @@
+{
+  "aircraft": [
+    {
+      "name": "Su-30MKI",
+      "group": "India",
+      "type": "air_superiority",
+      "speed": 0.85,
+      "range": 0.9,
+      "detection": 0.85,
+      "engagement_range": 0.8,
+      "maneuverability": 0.9,
+      "stealth": 0.4,
+      "loadout": {
+        "systems": [
+          { "name": "R-77", "category": "air", "range": 0.8, "effectiveness": 0.85 },
+          { "name": "BrahMos-A", "category": "ground", "range": 0.9, "effectiveness": 0.95 }
+        ],
+        "capacity": 0.9
+      }
+    },
+    {
+      "name": "Rafale",
+      "group": "India",
+      "type": "multirole",
+      "speed": 0.85,
+      "range": 0.85,
+      "detection": 0.9,
+      "engagement_range": 0.9,
+      "maneuverability": 0.85,
+      "stealth": 0.6,
+      "loadout": {
+        "systems": [
+          { "name": "Meteor", "category": "air", "range": 0.95, "effectiveness": 0.95 },
+          { "name": "SCALP", "category": "ground", "range": 0.9, "effectiveness": 0.9 }
+        ],
+        "capacity": 0.85
+      }
+    },
+    {
+      "name": "Tejas",
+      "group": "India",
+      "type": "light_fighter",
+      "speed": 0.75,
+      "range": 0.7,
+      "detection": 0.75,
+      "engagement_range": 0.7,
+      "maneuverability": 0.85,
+      "stealth": 0.5,
+      "loadout": {
+        "systems": [
+          { "name": "Astra", "category": "air", "range": 0.75, "effectiveness": 0.8 }
+        ],
+        "capacity": 0.7
+      }
+    },
+    {
+      "name": "MiG-29",
+      "group": "India",
+      "type": "interceptor",
+      "speed": 0.9,
+      "range": 0.7,
+      "detection": 0.7,
+      "engagement_range": 0.75,
+      "maneuverability": 0.9,
+      "stealth": 0.3,
+      "loadout": {
+        "systems": [
+          { "name": "R-73", "category": "air", "range": 0.7, "effectiveness": 0.8 }
+        ],
+        "capacity": 0.7
+      }
+    },
+    {
+      "name": "Mirage 2000",
+      "group": "India",
+      "type": "multirole",
+      "speed": 0.8,
+      "range": 0.75,
+      "detection": 0.75,
+      "engagement_range": 0.8,
+      "maneuverability": 0.8,
+      "stealth": 0.4,
+      "loadout": {
+        "systems": [
+          { "name": "MICA", "category": "air", "range": 0.8, "effectiveness": 0.85 }
+        ],
+        "capacity": 0.75
+      }
+    },
+
+    {
+      "name": "F-16",
+      "group": "Pakistan",
+      "type": "multirole",
+      "speed": 0.85,
+      "range": 0.8,
+      "detection": 0.85,
+      "engagement_range": 0.8,
+      "maneuverability": 0.85,
+      "stealth": 0.4,
+      "loadout": {
+        "systems": [
+          { "name": "AIM-120", "category": "air", "range": 0.85, "effectiveness": 0.9 }
+        ],
+        "capacity": 0.8
+      }
+    },
+    {
+      "name": "JF-17",
+      "group": "Pakistan",
+      "type": "multirole",
+      "speed": 0.75,
+      "range": 0.7,
+      "detection": 0.75,
+      "engagement_range": 0.7,
+      "maneuverability": 0.75,
+      "stealth": 0.4,
+      "loadout": {
+        "systems": [
+          { "name": "SD-10", "category": "air", "range": 0.75, "effectiveness": 0.8 }
+        ],
+        "capacity": 0.75
+      }
+    },
+    {
+      "name": "J-10C",
+      "group": "Pakistan",
+      "type": "multirole",
+      "speed": 0.85,
+      "range": 0.8,
+      "detection": 0.9,
+      "engagement_range": 0.85,
+      "maneuverability": 0.85,
+      "stealth": 0.5,
+      "loadout": {
+        "systems": [
+          { "name": "PL-15", "category": "air", "range": 0.95, "effectiveness": 0.9 }
+        ],
+        "capacity": 0.8
+      }
+    },
+    {
+      "name": "Mirage III",
+      "group": "Pakistan",
+      "type": "strike",
+      "speed": 0.7,
+      "range": 0.6,
+      "detection": 0.6,
+      "engagement_range": 0.65,
+      "maneuverability": 0.7,
+      "stealth": 0.2,
+      "loadout": {
+        "systems": [
+          { "name": "Basic Strike", "category": "ground", "range": 0.6, "effectiveness": 0.7 }
+        ],
+        "capacity": 0.7
+      }
+    }
+  ],
+
+  "air_defense": [
+    {
+      "name": "S-400",
+      "group": "India",
+      "type": "SAM",
+      "detection_range": 0.95,
+      "engagement_range": 0.95,
+      "threat_level": 0.95
+    },
+    {
+      "name": "Akash",
+      "group": "India",
+      "type": "SAM",
+      "detection_range": 0.75,
+      "engagement_range": 0.7,
+      "threat_level": 0.75
+    },
+    {
+      "name": "HQ-9",
+      "group": "Pakistan",
+      "type": "SAM",
+      "detection_range": 0.9,
+      "engagement_range": 0.9,
+      "threat_level": 0.9
+    }
+  ],
+
+  "ships": [
+    {
+      "name": "INS Kolkata",
+      "group": "India",
+      "type": "destroyer",
+      "detection": 0.85,
+      "defense": 0.9,
+      "engagement_range": 0.85,
+      "mobility": 0.7
+    },
+    {
+      "name": "PNS Zulfiquar",
+      "group": "Pakistan",
+      "type": "frigate",
+      "detection": 0.75,
+      "defense": 0.75,
+      "engagement_range": 0.75,
+      "mobility": 0.7
+    }
+  ],
+
+  "submarines": [
+    {
+      "name": "Scorpene-class",
+      "group": "India",
+      "type": "diesel-electric",
+      "stealth": 0.9,
+      "detection": 0.6,
+      "engagement_range": 0.8,
+      "endurance": 0.7
+    },
+    {
+      "name": "Agosta 90B",
+      "group": "Pakistan",
+      "type": "diesel-electric",
+      "stealth": 0.85,
+      "detection": 0.6,
+      "engagement_range": 0.75,
+      "endurance": 0.7
+    }
+  ]
+}
