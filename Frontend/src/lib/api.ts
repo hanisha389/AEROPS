@@ -27,6 +27,50 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
+export const tamperEventName = "aerops:tamper";
+
+let lastTamperEventAt = 0;
+const tamperEventCooldownMs = 8000;
+
+const emitTamperEvent = (tables: string[]) => {
+  const now = Date.now();
+  if (now - lastTamperEventAt < tamperEventCooldownMs) {
+    return;
+  }
+  lastTamperEventAt = now;
+
+  window.dispatchEvent(
+    new CustomEvent(tamperEventName, {
+      detail: {
+        tables,
+        timestamp: new Date(now).toISOString(),
+      },
+    }),
+  );
+};
+
+client.interceptors.response.use(
+  (response) => {
+    const tamperHeader = response.headers?.["x-data-tampering"];
+    if (tamperHeader === "true") {
+      const tablesHeader = response.headers?.["x-data-tampering-tables"];
+      const tables = typeof tablesHeader === "string" && tablesHeader.length > 0 ? tablesHeader.split(",") : [];
+      emitTamperEvent(tables);
+    }
+    return response;
+  },
+  (error) => {
+    const response = error?.response;
+    const tamperHeader = response?.headers?.["x-data-tampering"];
+    if (tamperHeader === "true") {
+      const tablesHeader = response?.headers?.["x-data-tampering-tables"];
+      const tables = typeof tablesHeader === "string" && tablesHeader.length > 0 ? tablesHeader.split(",") : [];
+      emitTamperEvent(tables);
+    }
+    return Promise.reject(error);
+  },
+);
+
 export interface PilotPayload {
   name: string;
   registrationNumber: string;

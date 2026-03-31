@@ -16,6 +16,7 @@ from app.models.pilot import Pilot, PilotMedical, PilotMedicalDetails, PilotMedi
 from app.models.training import PilotTrainingLog
 from app.schemas.training import TrainingRunResponse, TrainingWorkflowRequest, TrainingWorkflowResponse
 from app.services.documents import create_document_from_template, ensure_default_templates
+from app.security import hash_value
 
 router = APIRouter(prefix="/training", tags=["training"])
 
@@ -208,7 +209,7 @@ def complete_training_workflow(
             AircraftMaintenanceLog(
                 aircraft_id=aircraft_id,
                 log_type="PRE_FLIGHT_INSPECTION",
-                summary=f"Pre-training inspection for {payload.trainingType}",
+                summary=hash_value(f"Pre-training inspection for {payload.trainingType}"),
                 document_id=pre_document.id,
                 created_at=now,
             )
@@ -238,7 +239,7 @@ def complete_training_workflow(
             AircraftMaintenanceLog(
                 aircraft_id=aircraft_id,
                 log_type="POST_FLIGHT_INSPECTION",
-                summary=f"Post-training inspection for {payload.trainingType}",
+                summary=hash_value(f"Post-training inspection for {payload.trainingType}"),
                 document_id=post_document.id,
                 created_at=now,
             )
@@ -320,7 +321,9 @@ def complete_training_workflow(
                     AircraftMaintenanceLog(
                         aircraft_id=aircraft_id,
                         log_type="MAINTENANCE_ENTRY",
-                        summary=f"Auto-reported critical {component} issue from training ({payload.trainingType})",
+                        summary=hash_value(
+                            f"Auto-reported critical {component} issue from training ({payload.trainingType})"
+                        ),
                         document_id=None,
                         created_at=now,
                     )
@@ -331,7 +334,7 @@ def complete_training_workflow(
                     AircraftMaintenanceLog(
                         aircraft_id=aircraft_id,
                         log_type="TRAINING_CRITICAL_ALERT",
-                        summary=f"{state} {component} status reported to engineering workflow",
+                        summary=hash_value(f"{state} {component} status reported to engineering workflow"),
                         document_id=post_document.id,
                         created_at=now,
                     )
@@ -389,13 +392,13 @@ def complete_training_workflow(
         db.add(
             PilotMedicalLog(
                 pilot_id=pilot.id,
-                flight_context=f"Training - {payload.trainingType}",
+                flight_context=hash_value(f"Training - {payload.trainingType}"),
                 fatigue_level=medical_input.fatigueLevel,
                 stress_level=None,
                 sleep_quality_score=0,
                 cognitive_readiness=0,
                 safe_to_assign=fit_for_duty,
-                remarks=medical_details.clearance_remarks,
+                remarks=hash_value(medical_details.clearance_remarks),
                 created_at=now,
             )
         )
@@ -418,7 +421,7 @@ def complete_training_workflow(
                 training_type=payload.trainingType,
                 result="Completed",
                 aircraft_id=payload.aircraftIds[0],
-                debrief=payload.notes,
+                debrief=hash_value(payload.notes),
                 created_at=now,
             )
         )

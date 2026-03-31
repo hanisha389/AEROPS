@@ -20,6 +20,7 @@ from app.models.pilot import (
 )
 from app.models.training import PilotTrainingLog
 from app.schemas.pilot import PilotCreate, PilotRead, PilotUpdate
+from app.security import hash_value
 
 router = APIRouter(prefix="/pilots", tags=["pilots"])
 
@@ -184,7 +185,8 @@ def create_pilot(
     if context.role != ROLE_ADMIN_COMMANDER:
         raise HTTPException(status_code=403, detail="Only admin/commander can create pilots")
 
-    existing = db.query(Pilot).filter(Pilot.registration_number == payload.registrationNumber).first()
+    hashed_registration = hash_value(payload.registrationNumber)
+    existing = db.query(Pilot).filter(Pilot.registration_number == hashed_registration).first()
     if existing:
         raise HTTPException(status_code=409, detail="Pilot registration number already exists")
     existing_service = db.query(PilotPersonalDetails).filter(PilotPersonalDetails.service_number == payload.personalDetails.serviceNumber).first()
@@ -193,7 +195,7 @@ def create_pilot(
 
     pilot = Pilot(
         name=payload.name,
-        registration_number=payload.registrationNumber,
+        registration_number=hashed_registration,
         rank=payload.rank,
         call_sign=payload.callSign,
         assigned_aircraft=payload.assignedAircraft,

@@ -8,6 +8,7 @@ from app.models.aircraft import Aircraft, AircraftComponentStatus, AircraftIssue
 from app.models.maintenance import AircraftMaintenanceLog, MaintenanceEntry
 from app.schemas.maintenance import MaintenanceEntryComplete, MaintenanceEntryCreate
 from app.services.documents import create_document_from_template, ensure_default_templates
+from app.security import hash_value
 
 router = APIRouter(prefix="/maintenance", tags=["maintenance"])
 
@@ -100,7 +101,7 @@ def create_entry(
         AircraftMaintenanceLog(
             aircraft_id=payload.aircraftId,
             log_type="MAINTENANCE_ENTRY",
-            summary=f"{payload.issueType} issue registered ({payload.severity})",
+            summary=hash_value(f"{payload.issueType} issue registered ({payload.severity})"),
             document_id=document.id,
             created_at=now,
         )
@@ -199,7 +200,7 @@ def complete_entry(
         AircraftMaintenanceLog(
             aircraft_id=entry.aircraft_id,
             log_type="MAINTENANCE_COMPLETION",
-            summary=f"Maintenance completion recorded: {payload.issueResolved}",
+            summary=hash_value(f"Maintenance completion recorded: {payload.issueResolved}"),
             document_id=document.id,
             created_at=now,
         )

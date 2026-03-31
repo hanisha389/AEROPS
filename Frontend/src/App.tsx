@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import IntegrityAlert from "@/components/IntegrityAlert";
 import PinEntry from "./pages/PinEntry";
 import MainMenu from "./pages/MainMenu";
 import PilotInfo from "./pages/PilotInfo";
@@ -43,6 +44,7 @@ const ProtectedRoute = ({ children, routeKey }: { children: ReactElement; routeK
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <IntegrityAlert />
       <Toaster />
       <Sonner />
       <BrowserRouter>

@@ -7,6 +7,7 @@ import re
 from app.models.engineer import Engineer, EngineerMaintenanceLog, EngineerMaintenanceReport
 from app.models.aircraft import Aircraft, AircraftComponentStatus, AircraftIssue
 from app.models.maintenance import AircraftMaintenanceLog
+from app.security import hash_value
 from app.schemas.engineer import (
     EngineerCreate,
     EngineerIssueAssignmentCreate,
@@ -160,7 +161,7 @@ def assign_issue(payload: EngineerIssueAssignmentCreate, db: Session = Depends(g
         AircraftMaintenanceLog(
             aircraft_id=payload.aircraftId,
             log_type="ENGINEER_ASSIGNMENT",
-            summary=f"Issue {issue.id} assigned to engineer {engineer.service_id}",
+            summary=hash_value(f"Issue {issue.id} assigned to engineer {engineer.service_id}"),
             document_id=None,
             created_at=now,
         )
@@ -377,8 +378,10 @@ def update_engineer_log_status(
             AircraftMaintenanceLog(
                 aircraft_id=log.aircraft_id,
                 log_type="ENGINEER_TASK_COMPLETION",
-                summary=f"Engineer task completed for {log.aircraft_id}: {log.work_item}"
-                + (f" (issue {issue.id})" if issue is not None else ""),
+                summary=hash_value(
+                    f"Engineer task completed for {log.aircraft_id}: {log.work_item}"
+                    + (f" (issue {issue.id})" if issue is not None else "")
+                ),
                 document_id=None,
                 created_at=datetime.utcnow().isoformat(),
             )
