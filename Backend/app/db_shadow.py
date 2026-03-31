@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.db import Base
+from app.db import Base, ensure_hash_columns
 
 
 def _default_shadow_url() -> str:
@@ -22,3 +22,4 @@ def init_shadow_db() -> None:
     from app.models import access_code, aircraft, document, engineer, maintenance, pilot, simulation, training  # noqa: F401
 
     Base.metadata.create_all(bind=shadow_engine)
+    ensure_hash_columns(shadow_engine)

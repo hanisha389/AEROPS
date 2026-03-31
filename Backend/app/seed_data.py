@@ -163,7 +163,8 @@ def seed(db: Session) -> None:
     for entry in pilot_seed:
         pilot = Pilot(
             name=entry["name"],
-            registration_number=hash_value(entry["registration_number"]),
+            registration_number=entry["registration_number"],
+            registration_number_hash=hash_value(entry["registration_number"]),
             rank=entry["rank"],
             call_sign=entry["call_sign"],
             assigned_aircraft=entry["assigned_aircraft"],
@@ -238,7 +239,12 @@ def seed(db: Session) -> None:
                         training_type=training_type,
                         result=result,
                         aircraft_id=entry["assigned_aircraft"],
-                        debrief=hash_value(
+                        debrief=(
+                            "Stable performance with minor adjustments required."
+                            if result == "PASS"
+                            else "Deviations noted; remedial drills scheduled."
+                        ),
+                        debrief_hash=hash_value(
                             "Stable performance with minor adjustments required."
                             if result == "PASS"
                             else "Deviations noted; remedial drills scheduled."
@@ -288,12 +294,18 @@ def seed(db: Session) -> None:
                 db.add(
                     PilotMedicalLog(
                         pilot_id=pilot.id,
-                        flight_context=hash_value(f"Post-training check #{idx + 1} for {entry['mission_name']}"),
+                        flight_context=f"Post-training check #{idx + 1} for {entry['mission_name']}",
+                        flight_context_hash=hash_value(f"Post-training check #{idx + 1} for {entry['mission_name']}"),
                         fatigue_level=fatigue,
                         sleep_quality_score=6.1 if is_medical_hold else round(rng.uniform(7.2, 9.0), 1),
                         cognitive_readiness=6.4 if is_medical_hold else round(rng.uniform(7.5, 9.3), 1),
                         safe_to_assign=safe_to_assign,
-                        remarks=hash_value(
+                        remarks=(
+                            "Medical leave enforced. Follow-up scheduled for recovery assessment."
+                            if is_medical_hold
+                            else "Vitals stable. Cleared for next sortie."
+                        ),
+                        remarks_hash=hash_value(
                             "Medical leave enforced. Follow-up scheduled for recovery assessment."
                             if is_medical_hold
                             else "Vitals stable. Cleared for next sortie."
@@ -398,7 +410,8 @@ def seed(db: Session) -> None:
                 AircraftMaintenanceLog(
                     aircraft_id=issue["aircraft_id"],
                     log_type="TRAINING_CRITICAL_ALERT",
-                    summary=hash_value(issue["description"]),
+                    summary=issue["description"],
+                    summary_hash=hash_value(issue["description"]),
                     document_id=None,
                     created_at=iso_timestamp(days_ago=2),
                 )
@@ -450,7 +463,8 @@ def seed(db: Session) -> None:
                 AircraftMaintenanceLog(
                     aircraft_id=entry["aircraft_id"],
                     log_type="MAINTENANCE_ENTRY",
-                    summary=hash_value(entry["notes"]),
+                    summary=entry["notes"],
+                    summary_hash=hash_value(entry["notes"]),
                     document_id=None,
                     created_at=entry["created_at"],
                 )

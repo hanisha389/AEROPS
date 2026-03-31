@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.dependencies.db import get_db
 from app.dependencies.roles import (
@@ -186,7 +187,17 @@ def create_pilot(
         raise HTTPException(status_code=403, detail="Only admin/commander can create pilots")
 
     hashed_registration = hash_value(payload.registrationNumber)
-    existing = db.query(Pilot).filter(Pilot.registration_number == hashed_registration).first()
+    existing = (
+        db.query(Pilot)
+        .filter(
+            or_(
+                Pilot.registration_number == payload.registrationNumber,
+                Pilot.registration_number == hashed_registration,
+                Pilot.registration_number_hash == hashed_registration,
+            )
+        )
+        .first()
+    )
     if existing:
         raise HTTPException(status_code=409, detail="Pilot registration number already exists")
     existing_service = db.query(PilotPersonalDetails).filter(PilotPersonalDetails.service_number == payload.personalDetails.serviceNumber).first()
@@ -195,7 +206,8 @@ def create_pilot(
 
     pilot = Pilot(
         name=payload.name,
-        registration_number=hashed_registration,
+        registration_number=payload.registrationNumber,
+        registration_number_hash=hashed_registration,
         rank=payload.rank,
         call_sign=payload.callSign,
         assigned_aircraft=payload.assignedAircraft,

@@ -23,5 +23,6 @@ class AircraftMaintenanceLog(Base):
     aircraft_id = Column(String(50), ForeignKey("aircraft.id", ondelete="CASCADE"), nullable=False, index=True)
     log_type = Column(String(80), nullable=False)
     summary = Column(Text, nullable=True)
+    summary_hash = Column(String(64), nullable=True)
     document_id = Column(Integer, ForeignKey("generated_documents.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(String(50), nullable=False)

@@ -12,6 +12,7 @@ class PilotTrainingLog(Base):
     result = Column(String(80), nullable=True)
     aircraft_id = Column(String(50), nullable=True)
     debrief = Column(Text, nullable=True)
+    debrief_hash = Column(String(64), nullable=True)
     created_at = Column(String(50), nullable=False)
 
     pilot = relationship("Pilot", back_populates="trainings")

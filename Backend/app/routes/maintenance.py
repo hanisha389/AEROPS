@@ -101,7 +101,8 @@ def create_entry(
         AircraftMaintenanceLog(
             aircraft_id=payload.aircraftId,
             log_type="MAINTENANCE_ENTRY",
-            summary=hash_value(f"{payload.issueType} issue registered ({payload.severity})"),
+            summary=f"{payload.issueType} issue registered ({payload.severity})",
+            summary_hash=hash_value(f"{payload.issueType} issue registered ({payload.severity})"),
             document_id=document.id,
             created_at=now,
         )
@@ -200,7 +201,8 @@ def complete_entry(
         AircraftMaintenanceLog(
             aircraft_id=entry.aircraft_id,
             log_type="MAINTENANCE_COMPLETION",
-            summary=hash_value(f"Maintenance completion recorded: {payload.issueResolved}"),
+            summary=f"Maintenance completion recorded: {payload.issueResolved}",
+            summary_hash=hash_value(f"Maintenance completion recorded: {payload.issueResolved}"),
             document_id=document.id,
             created_at=now,
         )
