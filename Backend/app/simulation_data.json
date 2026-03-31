@@ -182,6 +182,78 @@
       "detection_range": 0.9,
       "engagement_range": 0.9,
       "threat_level": 0.9
+    },
+    {
+      "name": "HQ-9P",
+      "group": "Pakistan",
+      "type": "SAM",
+      "detection_range": 0.88,
+      "engagement_range": 0.86,
+      "threat_level": 0.86
+    },
+    {
+      "name": "HQ-9B",
+      "group": "Pakistan",
+      "type": "SAM",
+      "detection_range": 0.93,
+      "engagement_range": 0.92,
+      "threat_level": 0.9
+    },
+    {
+      "name": "LY-80 (HHQ-16)",
+      "group": "Pakistan",
+      "type": "SAM",
+      "detection_range": 0.72,
+      "engagement_range": 0.7,
+      "threat_level": 0.72
+    },
+    {
+      "name": "FM-90",
+      "group": "Pakistan",
+      "type": "SAM",
+      "detection_range": 0.55,
+      "engagement_range": 0.5,
+      "threat_level": 0.5
+    },
+    {
+      "name": "Anza-I",
+      "group": "Pakistan",
+      "type": "MANPADS",
+      "detection_range": 0.45,
+      "engagement_range": 0.4,
+      "threat_level": 0.45
+    },
+    {
+      "name": "Anza-II",
+      "group": "Pakistan",
+      "type": "MANPADS",
+      "detection_range": 0.5,
+      "engagement_range": 0.45,
+      "threat_level": 0.5
+    },
+    {
+      "name": "Anza-III",
+      "group": "Pakistan",
+      "type": "MANPADS",
+      "detection_range": 0.55,
+      "engagement_range": 0.5,
+      "threat_level": 0.55
+    },
+    {
+      "name": "HT-233",
+      "group": "Pakistan",
+      "type": "Radar",
+      "detection_range": 0.85,
+      "engagement_range": 0.2,
+      "threat_level": 0.6
+    },
+    {
+      "name": "IBIS-150",
+      "group": "Pakistan",
+      "type": "Radar",
+      "detection_range": 0.8,
+      "engagement_range": 0.2,
+      "threat_level": 0.55
     }
   ],
 

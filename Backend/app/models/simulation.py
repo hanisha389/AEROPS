@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Float, Integer, String
+from sqlalchemy import Column, Float, Integer, String, JSON
 from app.db import Base
 
 
@@ -35,3 +35,10 @@ class AirspaceZoneVertex(Base):
     vertex_order = Column(Integer, nullable=False)
     lat = Column(Float, nullable=False)
     lng = Column(Float, nullable=False)
+
+
+class SimulationState(Base):
+    __tablename__ = "simulation"
+
+    id = Column(Integer, primary_key=True, index=True)
+    payload = Column(JSON, nullable=False, default=dict)

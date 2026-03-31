@@ -207,3 +207,134 @@ class SimulationRunResponse(BaseModel):
     strategies: list[SimulationStrategy] = Field(default_factory=list)
     targetProfile: SimulationTargetProfile
     aircraftLoadout: list[SimulationAircraftLoadout] = Field(default_factory=list)
+
+
+class SimulationGridBounds(BaseModel):
+    north: float
+    south: float
+    east: float
+    west: float
+
+
+class SimulationGridCell(BaseModel):
+    row: int
+    col: int
+    lat: float
+    lng: float
+    zone: Literal["green", "yellow", "red"]
+    risk: float
+    defense: float
+    bounds: SimulationGridBounds
+
+
+class SimulationGridZone(BaseModel):
+    lat: float
+    lng: float
+    type: Literal["green", "yellow", "red"]
+
+
+class SimulationGridLoadoutItem(BaseModel):
+    name: str
+    quantity: int = Field(default=1, ge=1, le=10)
+
+
+class SimulationGridPilotSelection(BaseModel):
+    pilot_id: int
+    aircraft: str
+    loadout: list[SimulationGridLoadoutItem] = Field(default_factory=list)
+
+
+class SimulationGridDefenseSelection(BaseModel):
+    name: str
+    count: int = Field(default=0, ge=0, le=25)
+
+
+class SimulationGridPresetSnapshot(BaseModel):
+    team: str | None = None
+    pilots: list[SimulationGridPilotSelection] = Field(default_factory=list)
+    defense_type: str | None = None
+    defense_count: int = Field(default=0, ge=0, le=25)
+    defense_units: list[SimulationGridDefenseSelection] = Field(default_factory=list)
+    start: Coordinate | None = None
+    target: Coordinate | None = None
+    zones: list[SimulationGridZone] = Field(default_factory=list)
+
+
+class SimulationGridPreset(BaseModel):
+    name: str
+    snapshot: SimulationGridPresetSnapshot
+
+
+class SimulationGridPresetCreate(BaseModel):
+    name: str
+    snapshot: SimulationGridPresetSnapshot | None = None
+
+
+class SimulationGridState(BaseModel):
+    team: str | None = None
+    pilots: list[SimulationGridPilotSelection] = Field(default_factory=list)
+    defense_type: str | None = None
+    defense_count: int = Field(default=0, ge=0, le=25)
+    defense_units: list[SimulationGridDefenseSelection] = Field(default_factory=list)
+    start: Coordinate | None = None
+    target: Coordinate | None = None
+    zones: list[SimulationGridZone] = Field(default_factory=list)
+    presets: list[SimulationGridPreset] = Field(default_factory=list)
+
+
+class SimulationGridStateUpdate(BaseModel):
+    team: str | None = None
+    pilots: list[SimulationGridPilotSelection] | None = None
+    defense_type: str | None = None
+    defense_count: int | None = None
+    defense_units: list[SimulationGridDefenseSelection] | None = None
+    start: Coordinate | None = None
+    target: Coordinate | None = None
+    zones: list[SimulationGridZone] | None = None
+
+
+class SimulationGridRoute(BaseModel):
+    mode: Literal["direct", "safe", "balanced"]
+    path: list[Coordinate]
+    risk: float
+    green_ratio: float
+    yellow_ratio: float
+    red_ratio: float
+    casualty_percentage: float
+    success: float
+    losses: int
+    aircraft_losses: int
+    distance_km: float
+    time_hours: float
+    estimated_cost: float
+    what_if: dict
+
+
+class SimulationGridDataResponse(BaseModel):
+    teams: list[dict]
+    aircraft: list[dict]
+    weapons: list[dict]
+    defenses: list[dict]
+
+
+class SimulationGridStateResponse(BaseModel):
+    state: SimulationGridState
+    grid: list[SimulationGridCell]
+    defense_radius_km: float
+
+
+class SimulationGridRunRequest(BaseModel):
+    team: str
+    start: Coordinate
+    target: Coordinate
+    pilots: list[SimulationGridPilotSelection] = Field(default_factory=list)
+    defense_type: str
+    defense_count: int = Field(ge=0, le=25)
+    defense_units: list[SimulationGridDefenseSelection] = Field(default_factory=list)
+    zones: list[SimulationGridZone] = Field(default_factory=list)
+
+
+class SimulationGridRunResponse(BaseModel):
+    grid: list[SimulationGridCell]
+    routes: list[SimulationGridRoute]
+    defense_radius_km: float

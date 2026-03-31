@@ -13,6 +13,7 @@ import Training from "./pages/Training";
 import TrainingSimulator from "./pages/TrainingSimulator";
 import Simulation from "./pages/Simulation";
 import SimulationRun from "./pages/SimulationRun";
+import SimulationGridResults from "./pages/SimulationGridResults";
 import NotFound from "./pages/NotFound";
 import AddPilot from "./pages/AddPilot";
 import AddEngineer from "./pages/AddEngineer";
@@ -58,6 +59,7 @@ const App = () => (
           <Route path="/training/simulator" element={<ProtectedRoute routeKey="/training/simulator"><TrainingSimulator /></ProtectedRoute>} />
           <Route path="/simulation" element={<ProtectedRoute routeKey="/simulation"><Simulation /></ProtectedRoute>} />
           <Route path="/simulation/run" element={<ProtectedRoute routeKey="/simulation/run"><SimulationRun /></ProtectedRoute>} />
+          <Route path="/simulation/results" element={<ProtectedRoute routeKey="/simulation"><SimulationGridResults /></ProtectedRoute>} />
           <Route path="/documents" element={<ProtectedRoute routeKey="/documents"><Documents /></ProtectedRoute>} />
           <Route path="/add-pilot" element={<ProtectedRoute routeKey="/add-pilot"><AddPilot /></ProtectedRoute>} />
           <Route path="/add-engineer" element={<ProtectedRoute routeKey="/add-engineer"><AddEngineer /></ProtectedRoute>} />

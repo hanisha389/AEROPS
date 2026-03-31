@@ -200,6 +200,29 @@
     animation: tactical-node-pulse 9s ease-in-out infinite;
   }
 
+  .sim-marker {
+    border-radius: 9999px;
+    background: rgba(8, 15, 25, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sim-marker__dot {
+    display: block;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: rgba(56, 189, 248, 0.95);
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.65);
+  }
+
+  .sim-marker--target .sim-marker__dot {
+    background: rgba(239, 68, 68, 0.95);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.65);
+  }
+
   .tactical-ping {
     width: 1.15rem;
     height: 1.15rem;

@@ -463,6 +463,159 @@ export interface SimulationRunResponse {
   aircraftLoadout: SimulationAircraftLoadout[];
 }
 
+export type SimulationGridZoneType = "green" | "yellow" | "red";
+
+export interface SimulationGridBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
+export interface SimulationGridCell {
+  row: number;
+  col: number;
+  lat: number;
+  lng: number;
+  zone: SimulationGridZoneType;
+  risk: number;
+  defense: number;
+  bounds: SimulationGridBounds;
+}
+
+export interface SimulationGridZone {
+  lat: number;
+  lng: number;
+  type: SimulationGridZoneType;
+}
+
+export interface SimulationGridLoadoutItem {
+  name: string;
+  quantity: number;
+}
+
+export interface SimulationGridPilotSelection {
+  pilot_id: number;
+  aircraft: string;
+  loadout: SimulationGridLoadoutItem[];
+}
+
+export interface SimulationGridDefenseSelection {
+  name: string;
+  count: number;
+}
+
+export interface SimulationGridPresetSnapshot {
+  team?: string | null;
+  pilots: SimulationGridPilotSelection[];
+  defense_type?: string | null;
+  defense_count: number;
+  defense_units?: SimulationGridDefenseSelection[];
+  start?: MapCoordinate | null;
+  target?: MapCoordinate | null;
+  zones: SimulationGridZone[];
+}
+
+export interface SimulationGridPreset {
+  name: string;
+  snapshot: SimulationGridPresetSnapshot;
+}
+
+export interface SimulationGridPresetCreate {
+  name: string;
+  snapshot?: SimulationGridPresetSnapshot;
+}
+
+export interface SimulationGridState {
+  team?: string | null;
+  pilots?: SimulationGridPilotSelection[];
+  defense_type?: string | null;
+  defense_count?: number;
+  defense_units?: SimulationGridDefenseSelection[];
+  start?: MapCoordinate | null;
+  target?: MapCoordinate | null;
+  zones?: SimulationGridZone[];
+  presets?: SimulationGridPreset[];
+}
+
+export interface SimulationGridWeapon {
+  name: string;
+  category: string;
+  range: number;
+  effectiveness: number;
+  weight?: number;
+  cost?: number;
+}
+
+export interface SimulationGridAircraft {
+  name: string;
+  group: string;
+  loadout?: {
+    systems: SimulationGridWeapon[];
+    capacity: number;
+  };
+}
+
+export interface SimulationGridDefense {
+  name: string;
+  group: string;
+  type: string;
+  detection_range: number;
+  engagement_range: number;
+  threat_level: number;
+}
+
+export interface SimulationGridTeam {
+  name: string;
+}
+
+export interface SimulationGridDataResponse {
+  teams: SimulationGridTeam[];
+  aircraft: SimulationGridAircraft[];
+  weapons: SimulationGridWeapon[];
+  defenses: SimulationGridDefense[];
+}
+
+export interface SimulationGridStateResponse {
+  state: SimulationGridState;
+  grid: SimulationGridCell[];
+  defense_radius_km: number;
+}
+
+export interface SimulationGridRoute {
+  mode: "direct" | "safe" | "balanced";
+  path: MapCoordinate[];
+  risk: number;
+  green_ratio: number;
+  yellow_ratio: number;
+  red_ratio: number;
+  casualty_percentage: number;
+  success: number;
+  losses: number;
+  aircraft_losses: number;
+  distance_km: number;
+  time_hours: number;
+  estimated_cost: number;
+  what_if: Record<string, unknown>;
+}
+
+export interface SimulationGridRunRequest {
+  team: string;
+  start: MapCoordinate;
+  target: MapCoordinate;
+  pilots: SimulationGridPilotSelection[];
+  defense_type: string;
+  defense_count: number;
+  defense_units?: SimulationGridDefenseSelection[];
+  zones: SimulationGridZone[];
+}
+
+export interface SimulationGridRunResponse {
+  grid: SimulationGridCell[];
+  routes: SimulationGridRoute[];
+  defense_radius_km: number;
+}
+
 export const api = {
   getPin: () => client.get("/pin").then((res) => res.data),
   verifyPin: (code: string) => client.post("/pin/verify", { code }).then((res) => res.data),
@@ -508,4 +661,17 @@ export const api = {
   getSimulationBase: (): Promise<MapCoordinate> => client.get("/simulation/base").then((res) => res.data),
   setSimulationBase: (location: MapCoordinate): Promise<MapCoordinate> => client.put("/simulation/base", { location }).then((res) => res.data),
   runSimulation: (payload: SimulationRunPayload): Promise<SimulationRunResponse> => client.post("/simulation/run", payload).then((res) => res.data),
+  getSimulationGridData: (): Promise<SimulationGridDataResponse> => client.get("/simulation/grid/data").then((res) => res.data),
+  getSimulationGridState: (): Promise<SimulationGridStateResponse> => client.get("/simulation/grid/state").then((res) => res.data),
+  updateSimulationGridState: (payload: SimulationGridState): Promise<SimulationGridStateResponse> =>
+    client.post("/simulation/grid/state", payload).then((res) => res.data),
+  saveSimulationGridLayout: (payload: Pick<SimulationGridState, "zones">): Promise<SimulationGridStateResponse> =>
+    client.put("/simulation/grid/layout", payload).then((res) => res.data),
+  listSimulationGridPresets: (): Promise<SimulationGridPreset[]> => client.get("/simulation/grid/presets").then((res) => res.data),
+  saveSimulationGridPreset: (payload: SimulationGridPresetCreate): Promise<SimulationGridPreset[]> =>
+    client.post("/simulation/grid/presets", payload).then((res) => res.data),
+  deleteSimulationGridPreset: (name: string): Promise<SimulationGridPreset[]> =>
+    client.delete(`/simulation/grid/presets/${encodeURIComponent(name)}`).then((res) => res.data),
+  runSimulationGrid: (payload: SimulationGridRunRequest): Promise<SimulationGridRunResponse> =>
+    client.post("/simulation/grid/simulate", payload).then((res) => res.data),
 };

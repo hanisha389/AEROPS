@@ -1,5 +1,8 @@
 import hashlib
 import math
+import heapq
+import json
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -7,7 +10,7 @@ from app.dependencies.db import get_db
 from app.dependencies.roles import ROLE_ADMIN_COMMANDER, require_roles
 from app.models.aircraft import Aircraft
 from app.models.pilot import Pilot
-from app.models.simulation import AirspaceZone, AirspaceZoneMeta, AirspaceZoneVertex, SimulationBaseLocation
+from app.models.simulation import AirspaceZone, AirspaceZoneMeta, AirspaceZoneVertex, SimulationBaseLocation, SimulationState
 from app.schemas.simulation import (
     AirspaceZoneCreate,
     AirspaceZoneRead,
@@ -20,6 +23,17 @@ from app.schemas.simulation import (
     SimulationMetrics,
     SimulationPerformanceMetrics,
     SimulationPilotContext,
+    SimulationGridDataResponse,
+    SimulationGridLoadoutItem,
+    SimulationGridPreset,
+    SimulationGridPresetCreate,
+    SimulationGridPilotSelection,
+    SimulationGridRunRequest,
+    SimulationGridRunResponse,
+    SimulationGridState,
+    SimulationGridStateResponse,
+    SimulationGridStateUpdate,
+    SimulationGridZone,
     SimulationRunRequest,
     SimulationRunResponse,
     SimulationStrategy,
@@ -45,6 +59,877 @@ TARGET_SPEED_KMH = {
     "submarine": 30.0,
     "enemy_aircraft": 850.0,
 }
+
+
+GRID_SIZE = 25
+GRID_MAX_LOADOUT = 5
+
+GRID_DEFAULT_BOUNDS = {
+    "min_lat": 4.0,
+    "max_lat": 42.0,
+    "min_lng": 60.0,
+    "max_lng": 105.0,
+}
+
+GRID_DATA_PATH = Path(__file__).resolve().parents[1] / "simulation_data.json"
+if GRID_DATA_PATH.exists():
+    with GRID_DATA_PATH.open("r", encoding="utf-8") as handle:
+        GRID_RAW_DATA = json.load(handle)
+else:
+    GRID_RAW_DATA = {"aircraft": [], "air_defense": []}
+
+GRID_AIRCRAFT_LIST = GRID_RAW_DATA.get("aircraft", [])
+GRID_DEFENSE_LIST = GRID_RAW_DATA.get("air_defense", [])
+
+GRID_WEAPON_INDEX: dict[str, dict] = {}
+GRID_WEAPON_LIST: list[dict] = []
+for aircraft in GRID_AIRCRAFT_LIST:
+    for weapon in aircraft.get("loadout", {}).get("systems", []):
+        name = weapon.get("name")
+        if name and name not in GRID_WEAPON_INDEX:
+            GRID_WEAPON_INDEX[name] = weapon
+            GRID_WEAPON_LIST.append(weapon)
+
+GRID_AIRCRAFT_INDEX: dict[str, dict] = {
+    aircraft.get("name"): aircraft
+    for aircraft in GRID_AIRCRAFT_LIST
+    if aircraft.get("name")
+}
+GRID_DEFENSE_INDEX: dict[str, dict] = {
+    defense.get("name"): defense
+    for defense in GRID_DEFENSE_LIST
+    if defense.get("name")
+}
+
+GRID_TEAMS = sorted(
+    {
+        *(aircraft.get("group") for aircraft in GRID_AIRCRAFT_LIST if aircraft.get("group")),
+        *(defense.get("group") for defense in GRID_DEFENSE_LIST if defense.get("group")),
+    }
+)
+
+GRID_AIRCRAFT_STATS = [
+    "speed",
+    "range",
+    "detection",
+    "engagement_range",
+    "maneuverability",
+    "stealth",
+]
+
+
+def grid_aircraft_base_score(aircraft: dict) -> float:
+    values = [
+        aircraft.get(key)
+        for key in GRID_AIRCRAFT_STATS
+        if isinstance(aircraft.get(key), (int, float))
+    ]
+    if not values:
+        return 0.6
+    return sum(values) / len(values)
+
+
+if GRID_AIRCRAFT_LIST:
+    GRID_DEFAULT_AIRCRAFT_BASE = (
+        sum(grid_aircraft_base_score(aircraft) for aircraft in GRID_AIRCRAFT_LIST)
+        / len(GRID_AIRCRAFT_LIST)
+    )
+else:
+    GRID_DEFAULT_AIRCRAFT_BASE = 0.6
+
+
+def grid_weapon_weight(weapon: dict) -> float:
+    weapon_range = weapon.get("range", 0.6)
+    effectiveness = weapon.get("effectiveness", 0.6)
+    return 0.8 + weapon_range * 0.6 + effectiveness * 0.4
+
+
+def grid_weapon_cost(weapon: dict) -> float:
+    weapon_range = weapon.get("range", 0.6)
+    effectiveness = weapon.get("effectiveness", 0.6)
+    return 200.0 + weapon_range * 450.0 + effectiveness * 550.0
+
+
+for weapon in GRID_WEAPON_LIST:
+    weapon["weight"] = round(grid_weapon_weight(weapon), 2)
+    weapon["cost"] = round(grid_weapon_cost(weapon), 1)
+    if weapon.get("name"):
+        GRID_WEAPON_INDEX[weapon["name"]] = weapon
+
+
+def grid_clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(value, high))
+
+
+def grid_haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    radius = 6371.0
+    d_lat = math.radians(lat2 - lat1)
+    d_lng = math.radians(lng2 - lng1)
+    a = (
+        math.sin(d_lat / 2) ** 2
+        + math.cos(math.radians(lat1))
+        * math.cos(math.radians(lat2))
+        * math.sin(d_lng / 2) ** 2
+    )
+    c = 2 * math.asin(math.sqrt(a))
+    return radius * c
+
+
+def grid_aircraft_power(aircraft_key: str, loadout_items: list[SimulationGridLoadoutItem]) -> float:
+    aircraft = GRID_AIRCRAFT_INDEX.get(aircraft_key)
+    base = grid_aircraft_base_score(aircraft) if aircraft else GRID_DEFAULT_AIRCRAFT_BASE
+    capacity = 0.8
+    if aircraft:
+        capacity = aircraft.get("loadout", {}).get("capacity", capacity)
+    weapon_effectiveness = sum(
+        GRID_WEAPON_INDEX[item.name]["effectiveness"] * item.quantity
+        for item in loadout_items
+        if item.name in GRID_WEAPON_INDEX
+    )
+    total_weight = sum(
+        GRID_WEAPON_INDEX[item.name]["weight"] * item.quantity
+        for item in loadout_items
+        if item.name in GRID_WEAPON_INDEX
+    )
+    weight_penalty = grid_clamp(capacity + 0.2 - total_weight / 10.0, 0.3, 1.0)
+    return (base + weapon_effectiveness) * weight_penalty
+
+
+def grid_defense_score(defense: dict) -> float:
+    return (
+        0.45 * defense["detection_range"]
+        + 0.35 * defense["engagement_range"]
+        + 0.2 * defense["threat_level"]
+    )
+
+
+def grid_defense_power(defense_type: str, defense_count: int) -> float:
+    if defense_count <= 0 or not GRID_DEFENSE_LIST:
+        return 0.0
+    defense = GRID_DEFENSE_INDEX.get(defense_type)
+    if not defense:
+        defense = GRID_DEFENSE_LIST[0]
+    return grid_defense_score(defense) * defense_count
+
+
+def grid_defense_units_from_state(state: dict) -> list[dict]:
+    units = state.get("defense_units") or []
+    if units:
+        return units
+    defense_type = state.get("defense_type") or ""
+    defense_count = state.get("defense_count", 0)
+    if defense_type and defense_count > 0:
+        return [{"name": defense_type, "count": defense_count}]
+    return []
+
+
+def grid_total_defense_count(units: list[dict]) -> int:
+    return sum(unit.get("count", 0) for unit in units if unit.get("count", 0) > 0)
+
+
+def grid_defense_power_units(units: list[dict]) -> float:
+    if not units or not GRID_DEFENSE_LIST:
+        return 0.0
+    total = 0.0
+    for unit in units:
+        count = unit.get("count", 0)
+        if count <= 0:
+            continue
+        defense = GRID_DEFENSE_INDEX.get(unit.get("name"))
+        if not defense:
+            continue
+        total += grid_defense_score(defense) * count
+    return total
+
+
+def grid_defense_radius_km(defense_power_value: float, defense_count: int) -> float:
+    if defense_count <= 0:
+        return 0.0
+    return max(80.0, defense_power_value * 120.0)
+
+
+def grid_risk_at_distance(distance_km: float, defense_power_value: float, radius_km: float) -> float:
+    if radius_km <= 0:
+        return 0.05
+    if distance_km <= radius_km:
+        return grid_clamp(0.65 + defense_power_value * 0.06, 0.65, 0.95)
+    return 0.08
+
+
+def grid_zone_base_risk(zone: str) -> float:
+    if zone == "red":
+        return 0.85
+    if zone == "yellow":
+        return 0.55
+    return 0.25
+
+
+def grid_nearest_cell(lat_grid, lng_grid, point: Coordinate):
+    best = (0, 0)
+    best_dist = float("inf")
+    for r in range(GRID_SIZE):
+        for c in range(GRID_SIZE):
+            d_lat = lat_grid[r][c] - point.lat
+            d_lng = lng_grid[r][c] - point.lng
+            dist = d_lat * d_lat + d_lng * d_lng
+            if dist < best_dist:
+                best_dist = dist
+                best = (r, c)
+    return best
+
+
+def grid_build_grid(
+    start: Coordinate | None,
+    target: Coordinate | None,
+    defense_power_value: float,
+    defense_radius_km: float,
+    zones: list[SimulationGridZone],
+):
+    min_lat = GRID_DEFAULT_BOUNDS["min_lat"]
+    max_lat = GRID_DEFAULT_BOUNDS["max_lat"]
+    min_lng = GRID_DEFAULT_BOUNDS["min_lng"]
+    max_lng = GRID_DEFAULT_BOUNDS["max_lng"]
+
+    if min_lat == max_lat:
+        min_lat -= 0.2
+        max_lat += 0.2
+    if min_lng == max_lng:
+        min_lng -= 0.2
+        max_lng += 0.2
+
+    lat_step = (max_lat - min_lat) / GRID_SIZE
+    lng_step = (max_lng - min_lng) / GRID_SIZE
+
+    if target:
+        target_point = target
+    elif start:
+        target_point = start
+    else:
+        target_point = Coordinate(lat=(min_lat + max_lat) / 2, lng=(min_lng + max_lng) / 2)
+
+    corners = [
+        (min_lat, min_lng),
+        (min_lat, max_lng),
+        (max_lat, min_lng),
+        (max_lat, max_lng),
+    ]
+    max_dist = max(
+        grid_haversine_km(target_point.lat, target_point.lng, lat, lng)
+        for lat, lng in corners
+    )
+    if max_dist == 0:
+        max_dist = 1.0
+
+    grid = []
+    risk_grid = [[0.0 for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    defense_grid = [[0.0 for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    zone_grid = [["green" for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    lat_grid = [[0.0 for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    lng_grid = [[0.0 for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    bounds_grid = [[{} for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+
+    for r in range(GRID_SIZE):
+        for c in range(GRID_SIZE):
+            south = min_lat + r * lat_step
+            north = south + lat_step
+            west = min_lng + c * lng_step
+            east = west + lng_step
+            lat = south + lat_step / 2
+            lng = west + lng_step / 2
+
+            lat_grid[r][c] = lat
+            lng_grid[r][c] = lng
+            bounds_grid[r][c] = {
+                "north": north,
+                "south": south,
+                "east": east,
+                "west": west,
+            }
+
+    zone_overrides = {}
+    if zones:
+        for zone in zones:
+            row, col = grid_nearest_cell(lat_grid, lng_grid, Coordinate(lat=zone.lat, lng=zone.lng))
+            zone_overrides[(row, col)] = zone.type
+
+    for r in range(GRID_SIZE):
+        for c in range(GRID_SIZE):
+            lat = lat_grid[r][c]
+            lng = lng_grid[r][c]
+            dist = grid_haversine_km(target_point.lat, target_point.lng, lat, lng)
+            ratio = grid_clamp(dist / max_dist, 0.0, 1.0)
+            inside_radius = defense_radius_km > 0 and dist <= defense_radius_km
+            defense_cell = defense_power_value * (1.0 if inside_radius else 0.2)
+
+            if zone_overrides:
+                zone = zone_overrides.get((r, c))
+                if zone:
+                    base_risk = grid_zone_base_risk(zone)
+                else:
+                    base_risk = 1.0 - ratio
+                    zone = "red" if ratio <= 0.33 else "yellow" if ratio <= 0.66 else "green"
+            else:
+                base_risk = 1.0 - ratio
+                zone = "red" if ratio <= 0.33 else "yellow" if ratio <= 0.66 else "green"
+
+            risk = grid_risk_at_distance(dist, defense_power_value, defense_radius_km)
+
+            risk_grid[r][c] = risk
+            defense_grid[r][c] = defense_cell
+            zone_grid[r][c] = zone
+
+            grid.append(
+                {
+                    "row": r,
+                    "col": c,
+                    "lat": lat,
+                    "lng": lng,
+                    "zone": zone,
+                    "risk": risk,
+                    "defense": defense_cell,
+                    "bounds": bounds_grid[r][c],
+                }
+            )
+
+    return grid, risk_grid, defense_grid, zone_grid, lat_grid, lng_grid
+
+
+def grid_zone_penalty(zone: str, mode: str) -> float:
+    if mode == "safe":
+        if zone == "red":
+            return 520.0
+        if zone == "yellow":
+            return 55.0
+        return 1.2
+    if mode == "balanced":
+        if zone == "red":
+            return 140.0
+        if zone == "yellow":
+            return 16.0
+        return 1.05
+    if zone == "red":
+        return 8.0
+    if zone == "yellow":
+        return 2.0
+    return 1.0
+
+
+def grid_step_cost(
+    mode: str,
+    distance_km: float,
+    zone: str,
+    risk_value: float,
+    defense_value: float,
+    inside_radius: bool,
+    distance_to_target: float,
+    radius_km: float,
+):
+    if mode == "safe":
+        risk_weight = 7.0
+    elif mode == "balanced":
+        risk_weight = 5.0
+    else:
+        risk_weight = 2.5
+
+    risk = min(max(risk_value, 0.0), 1.0)
+    base_cost = distance_km * (1.0 + risk_weight * risk)
+
+    if zone == "red":
+        base_cost += 25.0
+        if distance_to_target > max(radius_km * 0.6, 80.0):
+            base_cost += 50.0
+
+    if inside_radius:
+        base_cost += 10.0
+
+    return base_cost
+
+
+def grid_dijkstra(
+    risk_grid,
+    defense_grid,
+    zone_grid,
+    lat_grid,
+    lng_grid,
+    start_rc,
+    target_rc,
+    mode,
+    target_point: Coordinate,
+    defense_radius_km: float,
+):
+    dist = [[math.inf for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    prev = [[None for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+
+    sr, sc = start_rc
+    tr, tc = target_rc
+
+    dist[sr][sc] = 0.0
+    heap = [(0.0, sr, sc)]
+
+    while heap:
+        cost, r, c = heapq.heappop(heap)
+        if cost != dist[r][c]:
+            continue
+        if (r, c) == (tr, tc):
+            break
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+            nr = r + dr
+            nc = c + dc
+            if 0 <= nr < GRID_SIZE and 0 <= nc < GRID_SIZE:
+                step_distance = grid_haversine_km(
+                    lat_grid[r][c],
+                    lng_grid[r][c],
+                    lat_grid[nr][nc],
+                    lng_grid[nr][nc],
+                )
+                distance_to_target = grid_haversine_km(
+                    lat_grid[nr][nc],
+                    lng_grid[nr][nc],
+                    target_point.lat,
+                    target_point.lng,
+                )
+                inside_radius = defense_radius_km > 0 and distance_to_target <= defense_radius_km
+                step = grid_step_cost(
+                    mode,
+                    step_distance,
+                    zone_grid[nr][nc],
+                    risk_grid[nr][nc],
+                    defense_grid[nr][nc],
+                    inside_radius,
+                    distance_to_target,
+                    defense_radius_km,
+                )
+                new_cost = cost + step
+                if new_cost < dist[nr][nc]:
+                    dist[nr][nc] = new_cost
+                    prev[nr][nc] = (r, c)
+                    heapq.heappush(heap, (new_cost, nr, nc))
+
+    path_cells = []
+    cur = (tr, tc)
+    if prev[tr][tc] is None and (tr, tc) != (sr, sc):
+        path_cells = [(sr, sc), (tr, tc)]
+    else:
+        while cur is not None:
+            path_cells.append(cur)
+            if cur == (sr, sc):
+                break
+            cur = prev[cur[0]][cur[1]]
+        path_cells.reverse()
+
+    path_coords = [
+        {"lat": lat_grid[r][c], "lng": lng_grid[r][c]} for r, c in path_cells
+    ]
+    if not path_cells:
+        return path_coords, 0.0
+    avg_risk = sum(risk_grid[r][c] for r, c in path_cells) / len(path_cells)
+
+    return path_coords, avg_risk
+
+
+def grid_zone_ratios_for_path(path: list[dict], lat_grid, lng_grid, zone_grid):
+    green_steps = 0
+    yellow_steps = 0
+    red_steps = 0
+    total_steps = 0
+    for point in path:
+        row, col = grid_nearest_cell(lat_grid, lng_grid, Coordinate(**point))
+        zone = zone_grid[row][col]
+        if zone == "green":
+            green_steps += 1
+        elif zone == "yellow":
+            yellow_steps += 1
+        else:
+            red_steps += 1
+        total_steps += 1
+
+    total_steps = max(1, total_steps)
+    green_ratio = green_steps / total_steps
+    yellow_ratio = yellow_steps / total_steps
+    red_ratio = red_steps / total_steps
+
+    return {
+        "green_steps": green_steps,
+        "yellow_steps": yellow_steps,
+        "red_steps": red_steps,
+        "green_ratio": green_ratio,
+        "yellow_ratio": yellow_ratio,
+        "red_ratio": red_ratio,
+    }
+
+
+def grid_route_outcome(attack_power: float, defense_power_value: float, pilot_count: int, ratios: dict):
+    casualty_ratio = (
+        ratios["yellow_ratio"] * 0.2
+        + ratios["red_ratio"] * 0.9
+        + defense_power_value * 0.5
+    )
+    casualty_ratio = grid_clamp(casualty_ratio, 0.05, 0.95)
+
+    success_ratio = attack_power / (
+        attack_power + defense_power_value * (1.0 + ratios["red_ratio"] * 2.0)
+    )
+    success_ratio = grid_clamp(success_ratio, 0.05, 0.95)
+
+    losses = int(pilot_count * casualty_ratio)
+    return {
+        "casualty_percentage": round(casualty_ratio * 100.0, 1),
+        "success": round(success_ratio * 100.0, 1),
+        "losses": losses,
+    }
+
+
+def grid_what_if_scenarios(attack_power: float, defense_power_value: float, pilot_count: int, ratios: dict):
+    more_defense = grid_route_outcome(attack_power, defense_power_value * 1.3, pilot_count, ratios)
+    less_defense = grid_route_outcome(attack_power, defense_power_value * 0.7, pilot_count, ratios)
+
+    enemy_chance = grid_clamp(ratios["red_ratio"] * 0.8, 0.0, 0.95)
+    enemy_defense = defense_power_value * (1.0 + enemy_chance)
+    enemy_reinforcement = grid_route_outcome(attack_power, enemy_defense, pilot_count, ratios)
+    enemy_reinforcement["chance"] = round(enemy_chance, 2)
+
+    our_chance = grid_clamp(ratios["yellow_ratio"] * 0.7, 0.0, 0.95)
+    our_attack = attack_power * (1.0 + our_chance)
+    our_reinforcement = grid_route_outcome(our_attack, defense_power_value, pilot_count, ratios)
+    our_reinforcement["chance"] = round(our_chance, 2)
+
+    return {
+        "more_defense": more_defense,
+        "less_defense": less_defense,
+        "enemy_reinforcement": enemy_reinforcement,
+        "our_reinforcement": our_reinforcement,
+    }
+
+
+def grid_direct_path(start: Coordinate, target: Coordinate, steps: int = 18) -> list[dict]:
+    path = []
+    for idx in range(steps + 1):
+        t = idx / steps
+        curve = math.sin(t * math.pi) * 0.18
+        lat = start.lat + (target.lat - start.lat) * t
+        lng = start.lng + (target.lng - start.lng) * t + curve
+        path.append({"lat": lat, "lng": lng})
+    return path
+
+
+def grid_path_distance_km(path: list[dict]) -> float:
+    if len(path) < 2:
+        return 0.0
+    total = 0.0
+    for idx in range(1, len(path)):
+        total += grid_haversine_km(
+            path[idx - 1]["lat"],
+            path[idx - 1]["lng"],
+            path[idx]["lat"],
+            path[idx]["lng"],
+        )
+    return total
+
+
+def grid_aircraft_speed_kmh(aircraft_key: str) -> float:
+    aircraft = GRID_AIRCRAFT_INDEX.get(aircraft_key)
+    speed_value = 0.7
+    if aircraft:
+        speed_value = aircraft.get("speed", speed_value)
+    return 650.0 + speed_value * 450.0
+
+
+def grid_build_state_response(state: dict):
+    defense_units = grid_defense_units_from_state(state)
+    defense_count = grid_total_defense_count(defense_units)
+    defense_value = grid_defense_power_units(defense_units)
+    defense_radius = grid_defense_radius_km(defense_value, defense_count)
+    start = Coordinate(**state["start"]) if state.get("start") else None
+    target = Coordinate(**state["target"]) if state.get("target") else None
+    zones = [SimulationGridZone(**zone) for zone in state.get("zones", [])]
+    grid, _, _, _, _, _ = grid_build_grid(start, target, defense_value, defense_radius, zones)
+    return {
+        "state": state,
+        "grid": grid,
+        "defense_radius_km": round(defense_radius, 1),
+    }
+
+
+def grid_default_state() -> dict:
+    return {
+        "team": None,
+        "pilots": [],
+        "defense_type": None,
+        "defense_count": 0,
+        "defense_units": [],
+        "start": None,
+        "target": None,
+        "zones": [],
+        "presets": [],
+    }
+
+
+def grid_state_snapshot(state: dict) -> dict:
+    return {
+        "team": state.get("team"),
+        "pilots": state.get("pilots", []),
+        "defense_type": state.get("defense_type"),
+        "defense_count": state.get("defense_count", 0),
+        "defense_units": grid_defense_units_from_state(state),
+        "start": state.get("start"),
+        "target": state.get("target"),
+        "zones": state.get("zones", []),
+    }
+
+
+def grid_get_state(db: Session) -> tuple[SimulationState, dict]:
+    row = db.query(SimulationState).order_by(SimulationState.id.asc()).first()
+    if not row:
+        payload = grid_default_state()
+        row = SimulationState(payload=payload)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row, payload
+
+    payload = row.payload or {}
+    defaults = grid_default_state()
+    updated = False
+    for key, value in defaults.items():
+        if key not in payload:
+            payload[key] = value
+            updated = True
+    if updated:
+        row.payload = payload
+        db.commit()
+    return row, payload
+
+
+@router.get("/grid/data", response_model=SimulationGridDataResponse)
+def grid_data():
+    return {
+        "teams": [{"name": team} for team in GRID_TEAMS],
+        "aircraft": GRID_AIRCRAFT_LIST,
+        "weapons": GRID_WEAPON_LIST,
+        "defenses": GRID_DEFENSE_LIST,
+    }
+
+
+@router.get("/grid/state", response_model=SimulationGridStateResponse)
+def grid_state(db: Session = Depends(get_db)):
+    _, state = grid_get_state(db)
+    return grid_build_state_response(state)
+
+
+@router.post("/grid/state", response_model=SimulationGridStateResponse)
+def grid_update_state(payload: SimulationGridStateUpdate, db: Session = Depends(get_db)):
+    row, state = grid_get_state(db)
+    if payload.team is not None:
+        state["team"] = payload.team
+    if payload.pilots is not None:
+        state["pilots"] = [pilot.dict() for pilot in payload.pilots]
+    if payload.defense_type is not None:
+        state["defense_type"] = payload.defense_type
+    if payload.defense_count is not None:
+        state["defense_count"] = payload.defense_count
+    if payload.defense_units is not None:
+        state["defense_units"] = [unit.dict() for unit in payload.defense_units]
+        total_count = grid_total_defense_count(state["defense_units"])
+        primary = state["defense_units"][0]["name"] if state["defense_units"] else None
+        state["defense_type"] = primary
+        state["defense_count"] = total_count
+    if payload.start is not None:
+        state["start"] = payload.start.dict()
+    if payload.target is not None:
+        state["target"] = payload.target.dict()
+    if payload.zones is not None:
+        state["zones"] = [zone.dict() for zone in payload.zones]
+
+    row.payload = state
+    db.commit()
+    return grid_build_state_response(state)
+
+
+@router.put("/grid/layout", response_model=SimulationGridStateResponse)
+def grid_save_layout(payload: SimulationGridStateUpdate, db: Session = Depends(get_db)):
+    if payload.zones is None:
+        raise HTTPException(status_code=400, detail="Zones payload is required")
+    row, state = grid_get_state(db)
+    state["zones"] = [zone.dict() for zone in payload.zones]
+    row.payload = state
+    db.commit()
+    return grid_build_state_response(state)
+
+
+@router.post("/grid/simulate", response_model=SimulationGridRunResponse)
+def grid_simulate(payload: SimulationGridRunRequest, db: Session = Depends(get_db)):
+    pilots = [pilot for pilot in payload.pilots if pilot.aircraft]
+    if not pilots and GRID_AIRCRAFT_LIST:
+        pilots = [SimulationGridPilotSelection(pilot_id=0, aircraft=GRID_AIRCRAFT_LIST[0]["name"], loadout=[])]
+
+    attack_power = 0.0
+    total_weight = 0.0
+    total_loadout_cost = 0.0
+    speed_values = []
+    for pilot in pilots:
+        loadout = [
+            item
+            for item in pilot.loadout
+            if item.name in GRID_WEAPON_INDEX and item.quantity > 0
+        ]
+        attack_power += grid_aircraft_power(pilot.aircraft, loadout)
+        for item in loadout:
+            weapon = GRID_WEAPON_INDEX[item.name]
+            total_weight += weapon["weight"] * item.quantity
+            total_loadout_cost += weapon["cost"] * item.quantity
+        speed_values.append(grid_aircraft_speed_kmh(pilot.aircraft))
+
+    defense_units = [unit.dict() for unit in payload.defense_units] if payload.defense_units else []
+    if not defense_units and payload.defense_type and payload.defense_count > 0:
+        defense_units = [{"name": payload.defense_type, "count": payload.defense_count}]
+    total_defense_count = grid_total_defense_count(defense_units)
+
+    if total_defense_count > 0:
+        for pilot in pilots:
+            if pilot.aircraft == "Su-30MKI":
+                attack_power *= 0.92
+            if pilot.aircraft == "Rafale":
+                attack_power *= 1.06
+
+    defense_power_value = grid_defense_power_units(defense_units)
+    defense_radius = grid_defense_radius_km(defense_power_value, total_defense_count)
+
+    grid, risk_grid, defense_grid, zone_grid, lat_grid, lng_grid = grid_build_grid(
+        payload.start, payload.target, defense_power_value, defense_radius, payload.zones
+    )
+
+    start_rc = grid_nearest_cell(lat_grid, lng_grid, payload.start)
+    target_rc = grid_nearest_cell(lat_grid, lng_grid, payload.target)
+
+    pilot_count = max(1, len(pilots))
+    weight_per_aircraft = total_weight / pilot_count
+    fuel_factor = 1.0 + weight_per_aircraft / 12.0
+    fuel_cost_per_km = 5200.0
+    avg_speed = sum(speed_values) / len(speed_values) if speed_values else 900.0
+
+    routes = []
+
+    direct = grid_direct_path(payload.start, payload.target)
+    direct_ratios = grid_zone_ratios_for_path(direct, lat_grid, lng_grid, zone_grid)
+    direct_outcome = grid_route_outcome(attack_power, defense_power_value, pilot_count, direct_ratios)
+    direct_success = direct_outcome["success"]
+    direct_casualty_pct = direct_outcome["casualty_percentage"]
+    direct_aircraft_losses = int(pilot_count * (direct_casualty_pct / 100.0))
+    direct_distance = grid_path_distance_km(direct)
+    direct_time = direct_distance / avg_speed if avg_speed > 0 else 0.0
+    direct_cost = direct_distance * fuel_cost_per_km * pilot_count * fuel_factor + total_loadout_cost
+    routes.append(
+        {
+            "mode": "direct",
+            "path": direct,
+            "risk": round(direct_ratios["red_ratio"], 3),
+            "green_ratio": round(direct_ratios["green_ratio"], 3),
+            "yellow_ratio": round(direct_ratios["yellow_ratio"], 3),
+            "red_ratio": round(direct_ratios["red_ratio"], 3),
+            "casualty_percentage": direct_casualty_pct,
+            "success": direct_success,
+            "losses": direct_outcome["losses"],
+            "aircraft_losses": direct_aircraft_losses,
+            "what_if": grid_what_if_scenarios(attack_power, defense_power_value, pilot_count, direct_ratios),
+            "distance_km": round(direct_distance, 2),
+            "time_hours": round(direct_time, 2),
+            "estimated_cost": round(direct_cost, 0),
+        }
+    )
+
+    for mode in ["safe", "balanced"]:
+        path, _ = grid_dijkstra(
+            risk_grid,
+            defense_grid,
+            zone_grid,
+            lat_grid,
+            lng_grid,
+            start_rc,
+            target_rc,
+            mode,
+            payload.target,
+            defense_radius,
+        )
+        ratios = grid_zone_ratios_for_path(path, lat_grid, lng_grid, zone_grid)
+        outcome = grid_route_outcome(attack_power, defense_power_value, pilot_count, ratios)
+        casualty_pct = outcome["casualty_percentage"]
+        success = outcome["success"]
+        if mode == "safe" and casualty_pct >= direct_casualty_pct:
+            casualty_pct = max(0.0, direct_casualty_pct - 3.0)
+            outcome["losses"] = int(pilot_count * (casualty_pct / 100.0))
+        aircraft_losses = int(pilot_count * (casualty_pct / 100.0))
+        distance_km = grid_path_distance_km(path)
+        time_hours = distance_km / avg_speed if avg_speed > 0 else 0.0
+        estimated_cost = distance_km * fuel_cost_per_km * pilot_count * fuel_factor + total_loadout_cost
+        routes.append(
+            {
+                "mode": mode,
+                "path": path,
+                "risk": round(ratios["red_ratio"], 3),
+                "green_ratio": round(ratios["green_ratio"], 3),
+                "yellow_ratio": round(ratios["yellow_ratio"], 3),
+                "red_ratio": round(ratios["red_ratio"], 3),
+                "casualty_percentage": casualty_pct,
+                "success": success,
+                "losses": outcome["losses"],
+                "aircraft_losses": aircraft_losses,
+                "what_if": grid_what_if_scenarios(attack_power, defense_power_value, pilot_count, ratios),
+                "distance_km": round(distance_km, 2),
+                "time_hours": round(time_hours, 2),
+                "estimated_cost": round(estimated_cost, 0),
+            }
+        )
+
+    row, state = grid_get_state(db)
+    state.update(
+        {
+            "team": payload.team,
+            "pilots": [pilot.dict() for pilot in pilots],
+            "defense_type": defense_units[0]["name"] if defense_units else payload.defense_type,
+            "defense_count": total_defense_count,
+            "defense_units": defense_units,
+            "start": payload.start.dict(),
+            "target": payload.target.dict(),
+            "zones": [zone.dict() for zone in payload.zones],
+        }
+    )
+    row.payload = state
+    db.commit()
+
+    return {
+        "grid": grid,
+        "routes": routes,
+        "defense_radius_km": round(defense_radius, 1),
+    }
+
+
+@router.get("/grid/presets", response_model=list[SimulationGridPreset])
+def grid_list_presets(db: Session = Depends(get_db)):
+    _, state = grid_get_state(db)
+    return state.get("presets", [])
+
+
+@router.post("/grid/presets", response_model=list[SimulationGridPreset])
+def grid_save_preset(payload: SimulationGridPresetCreate, db: Session = Depends(get_db)):
+    row, state = grid_get_state(db)
+    presets = state.get("presets", [])
+    snapshot = payload.snapshot.dict() if payload.snapshot else grid_state_snapshot(state)
+    filtered = [preset for preset in presets if preset.get("name") != payload.name]
+    filtered.append({"name": payload.name, "snapshot": snapshot})
+    state["presets"] = filtered
+    row.payload = state
+    db.commit()
+    return state.get("presets", [])
+
+
+@router.delete("/grid/presets/{preset_name}", response_model=list[SimulationGridPreset])
+def grid_delete_preset(preset_name: str, db: Session = Depends(get_db)):
+    row, state = grid_get_state(db)
+    presets = state.get("presets", [])
+    state["presets"] = [preset for preset in presets if preset.get("name") != preset_name]
+    row.payload = state
+    db.commit()
+    return state.get("presets", [])
 
 DETECTION_RANGE_KM = 28.0
 INTERCEPT_THRESHOLD_KM = 0.35
