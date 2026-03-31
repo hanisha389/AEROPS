@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import os
 import random
 from sqlalchemy.orm import Session
 from app.models.access_code import AccessCode
@@ -28,6 +29,7 @@ from app.models.aircraft import (
 
 def seed(db: Session) -> None:
     rng = random.Random()
+    clear_documents = os.getenv("SEED_CLEAR_DOCUMENTS", "false").strip().lower() in {"1", "true", "yes"}
 
     def iso_timestamp(days_ago: int = 0, hours_ago: int = 0) -> str:
         moment = datetime.utcnow() - timedelta(days=days_ago, hours=hours_ago)
@@ -52,8 +54,9 @@ def seed(db: Session) -> None:
     db.query(AircraftMission).delete()
     db.query(AircraftPilotAssignment).delete()
     db.query(AircraftMaintenanceLog).delete()
-    db.query(GeneratedDocument).delete()
-    db.query(DocumentTemplate).delete()
+    if clear_documents:
+        db.query(GeneratedDocument).delete()
+        db.query(DocumentTemplate).delete()
     db.query(MaintenanceEntry).delete()
     db.query(Aircraft).delete()
 

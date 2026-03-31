@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.dependencies.db import get_db
 from app.dependencies.roles import ROLE_ADMIN_COMMANDER, require_roles
@@ -739,6 +740,7 @@ def grid_get_state(db: Session) -> tuple[SimulationState, dict]:
         payload = grid_default_state()
         row = SimulationState(payload=payload)
         db.add(row)
+        flag_modified(row, "payload")
         db.commit()
         db.refresh(row)
         return row, payload
@@ -751,9 +753,17 @@ def grid_get_state(db: Session) -> tuple[SimulationState, dict]:
             payload[key] = value
             updated = True
     if updated:
-        row.payload = payload
+        row.payload = dict(payload)
+        flag_modified(row, "payload")
         db.commit()
     return row, payload
+
+
+def grid_persist_state(db: Session, row: SimulationState, state: dict) -> None:
+    row.payload = dict(state)
+    flag_modified(row, "payload")
+    db.add(row)
+    db.commit()
 
 
 @router.get("/grid/data", response_model=SimulationGridDataResponse)
@@ -796,8 +806,7 @@ def grid_update_state(payload: SimulationGridStateUpdate, db: Session = Depends(
     if payload.zones is not None:
         state["zones"] = [zone.dict() for zone in payload.zones]
 
-    row.payload = state
-    db.commit()
+    grid_persist_state(db, row, state)
     return grid_build_state_response(state)
 
 
@@ -807,8 +816,7 @@ def grid_save_layout(payload: SimulationGridStateUpdate, db: Session = Depends(g
         raise HTTPException(status_code=400, detail="Zones payload is required")
     row, state = grid_get_state(db)
     state["zones"] = [zone.dict() for zone in payload.zones]
-    row.payload = state
-    db.commit()
+    grid_persist_state(db, row, state)
     return grid_build_state_response(state)
 
 
@@ -956,8 +964,7 @@ def grid_simulate(payload: SimulationGridRunRequest, db: Session = Depends(get_d
             "zones": [zone.dict() for zone in payload.zones],
         }
     )
-    row.payload = state
-    db.commit()
+    grid_persist_state(db, row, state)
 
     return {
         "grid": grid,
@@ -980,8 +987,7 @@ def grid_save_preset(payload: SimulationGridPresetCreate, db: Session = Depends(
     filtered = [preset for preset in presets if preset.get("name") != payload.name]
     filtered.append({"name": payload.name, "snapshot": snapshot})
     state["presets"] = filtered
-    row.payload = state
-    db.commit()
+    grid_persist_state(db, row, state)
     return state.get("presets", [])
 
 
@@ -990,8 +996,7 @@ def grid_delete_preset(preset_name: str, db: Session = Depends(get_db)):
     row, state = grid_get_state(db)
     presets = state.get("presets", [])
     state["presets"] = [preset for preset in presets if preset.get("name") != preset_name]
-    row.payload = state
-    db.commit()
+    grid_persist_state(db, row, state)
     return state.get("presets", [])
 
 DETECTION_RANGE_KM = 28.0
