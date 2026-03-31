@@ -55,6 +55,21 @@ DEFAULT_TEMPLATES = [
         ],
     },
     {
+        "key": "training_debrief_report",
+        "title": "Training Debrief Report",
+        "sections": ["Debrief Summary", "Performance Metrics", "Telemetry Overview", "Recommendations"],
+        "required_fields": [
+            "trainingType",
+            "duration",
+            "debriefSource",
+            "performanceScore",
+            "performanceGrade",
+            "assessment",
+            "recommendations",
+            "pilotCallSigns",
+        ],
+    },
+    {
         "key": "maintenance_entry_report",
         "title": "Maintenance Entry Report",
         "sections": ["Entry Context", "Issue Details"],

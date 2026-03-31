@@ -6,8 +6,10 @@ import HumanBodyModel from "@/components/HumanBodyModel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import TrainingReportTemplate, { type TrainingReportData } from "@/components/training/TrainingReportTemplate";
 import { Panel } from "@/components/ui/custom/Panel";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { getCurrentRole } from "@/lib/rbac";
+import Chart from "chart.js/auto";
 
 const DEBRIEF_KEY = "aerops-training-step2-debrief";
 
@@ -51,6 +53,16 @@ interface SimulatorDebrief {
     altitudeMax?: number;
     headingRange?: string;
   };
+}
+
+interface AutoTelemetrySeries {
+  labels: string[];
+  speedExpected: number[];
+  speedActual: number[];
+  altitudeExpected: number[];
+  altitudeActual: number[];
+  headingExpected: number[];
+  headingActual: number[];
 }
 
 interface PerformanceReview {
@@ -144,6 +156,75 @@ const parseDurationMinutes = (raw: string) => {
   return Number(match?.[0] || 30);
 };
 
+const createSeededRandom = (seed: number) => {
+  let state = seed || 123456;
+  return () => {
+    state = (state * 9301 + 49297) % 233280;
+    return state / 233280;
+  };
+};
+
+const parseHeadingRange = (range?: string) => {
+  if (!range) return { min: 60, max: 295 };
+  const parts = range.split("-").map((value) => Number(value.trim()));
+  if (parts.length === 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+    return { min: parts[0], max: parts[1] };
+  }
+  return { min: 60, max: 295 };
+};
+
+const buildAutoTelemetry = (debrief: SimulatorDebrief, seed: number): AutoTelemetrySeries => {
+  const minutes = parseDurationMinutes(debrief.duration);
+  const telemetry = debrief.telemetrySummary || {};
+  const rng = createSeededRandom(seed);
+  const points = Math.max(24, Math.min(120, minutes * 2));
+
+  const speedMin = telemetry.speedMin ?? 210;
+  const speedMax = telemetry.speedMax ?? 312;
+  const speedAvg = telemetry.speedAvg ?? (speedMin + speedMax) / 2;
+  const altitudeAvg = telemetry.altitudeAvg ?? 3150;
+  const altitudeMax = telemetry.altitudeMax ?? 3800;
+  const headingRange = parseHeadingRange(telemetry.headingRange);
+
+  const labels: string[] = [];
+  const speedExpected: number[] = [];
+  const speedActual: number[] = [];
+  const altitudeExpected: number[] = [];
+  const altitudeActual: number[] = [];
+  const headingExpected: number[] = [];
+  const headingActual: number[] = [];
+
+  for (let i = 0; i < points; i += 1) {
+    const t = points === 1 ? 0 : i / (points - 1);
+    labels.push(`${Math.round(t * minutes)}m`);
+
+    const expectedSpeed = speedAvg + Math.sin(t * Math.PI * 2) * ((speedMax - speedMin) / 3);
+    const expectedAltitude = altitudeAvg + Math.sin(t * Math.PI) * ((altitudeMax - altitudeAvg) / 1.8);
+    const expectedHeading = headingRange.min + (headingRange.max - headingRange.min) * t;
+
+    const actualSpeed = expectedSpeed + (rng() - 0.5) * 28;
+    const actualAltitude = expectedAltitude + (rng() - 0.5) * 180;
+    const actualHeading = expectedHeading + (rng() - 0.5) * 24;
+
+    speedExpected.push(Number(expectedSpeed.toFixed(1)));
+    speedActual.push(Number(actualSpeed.toFixed(1)));
+    altitudeExpected.push(Number(expectedAltitude.toFixed(0)));
+    altitudeActual.push(Number(actualAltitude.toFixed(0)));
+    headingExpected.push(Number(expectedHeading.toFixed(0)));
+    headingActual.push(Number(actualHeading.toFixed(0)));
+  }
+
+  return {
+    labels,
+    speedExpected,
+    speedActual,
+    altitudeExpected,
+    altitudeActual,
+    headingExpected,
+    headingActual,
+  };
+};
+
 const buildOperationId = (timestamp: string, pilotIds: number[], trainingType: TrainingType) => {
   const date = new Date(timestamp);
   const dateCode = `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(date.getUTCDate()).padStart(2, "0")}`;
@@ -162,12 +243,13 @@ const Training = () => {
   const [pilotOptions, setPilotOptions] = useState<PilotOption[]>([]);
   const [selectedPilots, setSelectedPilots] = useState<number[]>([]);
   const [duration, setDuration] = useState(durationOptions[2]);
-  const [notes, setNotes] = useState("");
+  const [notes] = useState("");
   const [preCheckByAircraft, setPreCheckByAircraft] = useState<Record<string, ChecklistState>>({});
   const [postCheckByAircraft, setPostCheckByAircraft] = useState<Record<string, PostChecklistState>>({});
   const [pilotPreInspectionByPilot, setPilotPreInspectionByPilot] = useState<Record<number, PilotPreInspection>>({});
   const [medicalByPilot, setMedicalByPilot] = useState<Record<number, MedicalState>>({});
   const [debrief, setDebrief] = useState<SimulatorDebrief | null>(null);
+  const [autoTelemetry, setAutoTelemetry] = useState<AutoTelemetrySeries | null>(null);
   const [completionDebrief, setCompletionDebrief] = useState<{
     trainingType: TrainingType;
     duration: string;
@@ -183,6 +265,10 @@ const Training = () => {
   const [generatingReport, setGeneratingReport] = useState(false);
   const reportRef = useRef<HTMLDivElement | null>(null);
   const stepRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const autoSpeedCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const autoAltitudeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const autoHeadingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const autoChartRefs = useRef<Chart[]>([]);
 
   useEffect(() => {
     api.getPilots().then((rows) => setPilotOptions(rows));
@@ -197,6 +283,7 @@ const Training = () => {
       const parsed = JSON.parse(raw) as SimulatorDebrief;
       if (parsed?.duration && parsed?.outcome && parsed?.notes != null) {
         setDebrief(parsed);
+        setAutoTelemetry(null);
         setStep((prev) => Math.max(prev, 3));
       }
     } catch {
@@ -391,11 +478,85 @@ const Training = () => {
 
   useEffect(() => {
     setDebrief(null);
+    setAutoTelemetry(null);
   }, [trainingType, selectedPilots]);
 
   useEffect(() => {
     setCompletionDebrief(null);
-  }, [trainingType, selectedPilots, notes, duration]);
+  }, [trainingType, selectedPilots, duration]);
+
+  useEffect(() => {
+    autoChartRefs.current.forEach((chart) => chart.destroy());
+    autoChartRefs.current = [];
+
+    if (!autoTelemetry) {
+      return;
+    }
+
+    const makeChart = (
+      canvas: HTMLCanvasElement | null,
+      label: string,
+      expected: number[],
+      actual: number[],
+      color: string,
+    ) => {
+      if (!canvas) return null;
+      return new Chart(canvas, {
+        type: "line",
+        data: {
+          labels: autoTelemetry.labels,
+          datasets: [
+            {
+              label: `${label} (Expected)`,
+              data: expected,
+              borderColor: color,
+              pointRadius: 0,
+              borderWidth: 2,
+              tension: 0.25,
+            },
+            {
+              label: `${label} (Actual)`,
+              data: actual,
+              borderColor: "#94a3b8",
+              pointRadius: 0,
+              borderWidth: 1.5,
+              tension: 0.25,
+              borderDash: [6, 6],
+            },
+          ],
+        },
+        options: {
+          animation: false,
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: { color: "rgba(148, 163, 184, 0.16)" },
+              ticks: { color: "#94a3b8", maxTicksLimit: 8 },
+            },
+            y: {
+              grid: { color: "rgba(148, 163, 184, 0.16)" },
+              ticks: { color: "#94a3b8" },
+            },
+          },
+          plugins: {
+            legend: { labels: { color: "#cbd5e1" } },
+          },
+        },
+      });
+    };
+
+    const speedChart = makeChart(autoSpeedCanvasRef.current, "Speed (kts)", autoTelemetry.speedExpected, autoTelemetry.speedActual, "#22d3ee");
+    const altitudeChart = makeChart(autoAltitudeCanvasRef.current, "Altitude (m)", autoTelemetry.altitudeExpected, autoTelemetry.altitudeActual, "#f59e0b");
+    const headingChart = makeChart(autoHeadingCanvasRef.current, "Heading (deg)", autoTelemetry.headingExpected, autoTelemetry.headingActual, "#a78bfa");
+
+    autoChartRefs.current = [speedChart, altitudeChart, headingChart].filter(Boolean) as Chart[];
+
+    return () => {
+      autoChartRefs.current.forEach((chart) => chart.destroy());
+      autoChartRefs.current = [];
+    };
+  }, [autoTelemetry]);
 
   useEffect(() => {
     if (completionDebrief) {
@@ -507,6 +668,20 @@ const Training = () => {
         aircraftIds: selectedAircraftIds,
         duration: debrief.duration,
         notes: debrief.notes,
+        debrief: {
+          source: debrief.source === "planned" ? "AUTO PLANNED ROUTE" : "SIMULATOR RUN",
+          score: performanceReview.score,
+          grade: performanceReview.grade,
+          peakG: debrief.peakG,
+          peakStress: debrief.peakStress,
+          peakHeartRate: debrief.peakHeartRate,
+          peakFatigue: debrief.peakFatigue,
+          telemetrySummary: debrief.telemetrySummary,
+          plannedPath: debrief.plannedPath || [],
+          actionSummary: debrief.actionSummary || [],
+          assessment: performanceReview.summary,
+          recommendations: performanceReview.recommendations,
+        },
         preTrainingChecks: selectedAircraftIds.map((aircraftId) => ({
           aircraftId,
           checklist: preCheckByAircraft[aircraftId],
@@ -731,6 +906,8 @@ const Training = () => {
         return;
       }
       setDebrief(autoDebrief);
+      const seed = selectedPilots.reduce((sum, value) => sum + value, 0) + trainingType.length * 17;
+      setAutoTelemetry(buildAutoTelemetry(autoDebrief, seed));
       setStep(3);
       return;
     }
@@ -945,22 +1122,20 @@ const Training = () => {
                                     {durationOptions.map((option) => <option key={option}>{option}</option>)}
                                   </select>
                                 </label>
-                                <label className="block text-xs text-muted-foreground">Debrief Notes
-                                  <textarea className="mt-1 min-h-24 w-full border border-border bg-background/40 px-2 py-2" value={notes} onChange={(e) => setNotes(e.target.value)} />
-                                </label>
 
                                 <p className="font-rajdhani text-xs text-muted-foreground">Pilots and aircraft are auto-selected from Step 1.</p>
 
                                 <div className="border border-border/30 bg-background/20 p-3">
                                   <div className="flex flex-wrap gap-2">
-                                    <button
+                                    <Button
                                       type="button"
                                       onClick={startTrainingExecution}
-                                      className="border border-primary px-4 py-2 font-orbitron text-xs text-primary"
+                                      variant="outline"
+                                      className="border-primary font-orbitron text-xs tracking-[0.2em] uppercase text-primary"
                                     >
                                       START TRAINING
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                       type="button"
                                       onClick={() => {
                                         const autoDebrief = generatePlannedDebrief();
@@ -969,25 +1144,27 @@ const Training = () => {
                                           return;
                                         }
                                         setDebrief(autoDebrief);
+                                        const seed = selectedPilots.reduce((sum, value) => sum + value, 0) + trainingType.length * 17;
+                                        setAutoTelemetry(buildAutoTelemetry(autoDebrief, seed));
                                         setStep(3);
                                       }}
-                                      className="border border-border px-4 py-2 font-orbitron text-xs text-muted-foreground"
+                                      variant="outline"
+                                      className="border-border font-orbitron text-xs tracking-[0.2em] uppercase text-muted-foreground"
                                     >
-                                      SKIP SIMULATOR (AUTO ROUTE)
-                                    </button>
+                                      AUTO GENERATE
+                                    </Button>
                                   </div>
 
                                   {debrief && (
                                     <div className="mt-3 space-y-1">
                                       <p className="font-rajdhani text-sm text-primary">Debrief Summary</p>
+                                      <p className="font-rajdhani text-xs text-muted-foreground">Debrief Source: {debrief.source === "planned" ? "Auto Planned Route" : "Simulator Run"}</p>
                                       <p className="font-rajdhani text-xs text-muted-foreground">Duration: {debrief.duration}</p>
-                                      <p className="font-rajdhani text-xs text-muted-foreground">Outcome: {debrief.outcome}</p>
-                                      <p className="font-rajdhani text-xs text-muted-foreground">Source: {debrief.source === "planned" ? "Auto Planned Route" : "Simulator Run"}</p>
-                                      <p className="font-rajdhani text-xs text-muted-foreground">Notes: {debrief.notes}</p>
                                       <p className="font-rajdhani text-xs text-muted-foreground">Proceed to Step 3 for pilot performance review.</p>
                                     </div>
                                   )}
                                 </div>
+
                               </div>
                             )}
 
@@ -996,55 +1173,102 @@ const Training = () => {
                                 <p className="mb-2 font-orbitron text-xs tracking-[0.18em] text-muted-foreground">STEP 3 - POST-TRAINING DEBRIEF</p>
                                 {!debrief && <p className="text-xs text-muted-foreground">Run Step 2 first to generate debrief data.</p>}
                                 {debrief && performanceReview && (
-                                  <div className="space-y-2 border border-border/30 bg-background/20 p-3">
-                                    <p className="font-orbitron text-xs tracking-[0.14em] text-primary">PILOT PERFORMANCE REVIEW</p>
-                                    <p className="font-rajdhani text-xs text-muted-foreground">Debrief Source: {debrief.source === "planned" ? "Auto Planned Route" : "Simulator Run"}</p>
-                                    <p className="font-rajdhani text-xs text-muted-foreground">Duration: {debrief.duration}</p>
-                                    <p className="font-rajdhani text-xs text-muted-foreground">Performance Score: {performanceReview.score}/100</p>
-                                    <p className="font-rajdhani text-xs text-muted-foreground">Grade: {performanceReview.grade}</p>
-                                    <p className="font-rajdhani text-xs text-muted-foreground">Peak G: {(debrief.peakG ?? 0).toFixed(2)} g</p>
-                                    <p className="font-rajdhani text-xs text-muted-foreground">Peak Stress: {(debrief.peakStress ?? 0).toFixed(0)}%</p>
-                                    <p className="font-rajdhani text-xs text-muted-foreground">Peak Heart Rate: {(debrief.peakHeartRate ?? 0).toFixed(0)} bpm</p>
-                                    <p className="font-rajdhani text-xs text-muted-foreground">Peak Fatigue: {(debrief.peakFatigue ?? 0).toFixed(0)}%</p>
+                                  <div className="space-y-3 border border-border/30 bg-background/20 p-4">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                      <div>
+                                        <p className="font-orbitron text-xs tracking-[0.14em] text-primary">PILOT PERFORMANCE REVIEW</p>
+                                        <p className="mt-1 font-rajdhani text-xs text-muted-foreground">Debrief Source: {debrief.source === "planned" ? "Auto Planned Route" : "Simulator Run"}</p>
+                                        <p className="font-rajdhani text-xs text-muted-foreground">Duration: {debrief.duration}</p>
+                                      </div>
+                                      <div className="rounded border border-border/40 bg-background/30 px-3 py-2">
+                                        <p className="text-[0.65rem] text-muted-foreground">Performance Score</p>
+                                        <p className="font-orbitron text-sm text-primary">{performanceReview.score}/100</p>
+                                        <p className="text-[0.65rem] text-muted-foreground">Grade: {performanceReview.grade}</p>
+                                      </div>
+                                    </div>
+
+                                    <div className="grid gap-2 rounded border border-border/30 bg-background/30 p-3 md:grid-cols-4">
+                                      <div>
+                                        <p className="text-[0.65rem] text-muted-foreground">Peak G</p>
+                                        <p className="font-rajdhani text-sm text-primary">{(debrief.peakG ?? 0).toFixed(2)} g</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[0.65rem] text-muted-foreground">Peak Stress</p>
+                                        <p className="font-rajdhani text-sm text-primary">{(debrief.peakStress ?? 0).toFixed(0)}%</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[0.65rem] text-muted-foreground">Peak Heart Rate</p>
+                                        <p className="font-rajdhani text-sm text-primary">{(debrief.peakHeartRate ?? 0).toFixed(0)} bpm</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[0.65rem] text-muted-foreground">Peak Fatigue</p>
+                                        <p className="font-rajdhani text-sm text-primary">{(debrief.peakFatigue ?? 0).toFixed(0)}%</p>
+                                      </div>
+                                    </div>
+
                                     {debrief.telemetrySummary && (
-                                      <div className="border border-border/30 bg-background/30 p-2">
-                                        <p className="mb-1 text-[0.65rem] text-muted-foreground">Telemetry Summary</p>
+                                      <div className="border border-border/30 bg-background/30 p-3">
+                                        <p className="mb-2 text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">Telemetry Summary</p>
                                         <p className="text-xs text-muted-foreground">Speed: {debrief.telemetrySummary.speedMin ?? 0} - {debrief.telemetrySummary.speedMax ?? 0} kts (avg {debrief.telemetrySummary.speedAvg ?? 0})</p>
                                         <p className="text-xs text-muted-foreground">Altitude: avg {debrief.telemetrySummary.altitudeAvg ?? 0} m, peak {debrief.telemetrySummary.altitudeMax ?? 0} m</p>
                                         <p className="text-xs text-muted-foreground">Heading Range: {debrief.telemetrySummary.headingRange || "N/A"}</p>
                                       </div>
                                     )}
 
-                                    <div className="border border-border/30 bg-background/30 p-2">
-                                      <p className="mb-1 text-[0.65rem] text-muted-foreground">Pilot Scores</p>
-                                      {performanceReview.pilotBreakdown.map((item) => (
-                                        <p key={item.pilotId} className="text-xs text-muted-foreground">
-                                          <span className="text-primary">{item.callSign}</span>: {item.score}/100 ({item.grade})
-                                        </p>
-                                      ))}
-                                    </div>
-
-                                    {Array.isArray(debrief.plannedPath) && debrief.plannedPath.length > 0 && (
-                                      <div className="border border-border/30 bg-background/30 p-2">
-                                        <p className="mb-1 text-[0.65rem] text-muted-foreground">Planned Route</p>
-                                        {debrief.plannedPath.map((pathStep, index) => (
-                                          <p key={`${pathStep}-${index}`} className="text-xs text-muted-foreground">{index + 1}. {pathStep}</p>
-                                        ))}
+                                    {debrief.source === "planned" && autoTelemetry && (
+                                      <div className="border border-border/30 bg-background/30 p-3">
+                                        <p className="mb-2 text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">Auto Telemetry Comparison</p>
+                                        <p className="text-xs text-muted-foreground">Expected vs actual performance for the auto-planned route.</p>
+                                        <div className="mt-3 grid gap-3 md:grid-cols-3">
+                                          <div className="h-44 rounded border border-border/30 p-2">
+                                            <canvas ref={autoSpeedCanvasRef} />
+                                          </div>
+                                          <div className="h-44 rounded border border-border/30 p-2">
+                                            <canvas ref={autoAltitudeCanvasRef} />
+                                          </div>
+                                          <div className="h-44 rounded border border-border/30 p-2">
+                                            <canvas ref={autoHeadingCanvasRef} />
+                                          </div>
+                                        </div>
                                       </div>
                                     )}
 
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                      <div className="border border-border/30 bg-background/30 p-3">
+                                        <p className="mb-2 text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">Pilot Scores</p>
+                                        {performanceReview.pilotBreakdown.map((item) => (
+                                          <p key={item.pilotId} className="text-xs text-muted-foreground">
+                                            <span className="text-primary">{item.callSign}</span>: {item.score}/100 ({item.grade})
+                                          </p>
+                                        ))}
+                                      </div>
+
+                                      {Array.isArray(debrief.plannedPath) && debrief.plannedPath.length > 0 && (
+                                        <div className="border border-border/30 bg-background/30 p-3">
+                                          <p className="mb-2 text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">Planned Route</p>
+                                          {debrief.plannedPath.map((pathStep, index) => (
+                                            <p key={`${pathStep}-${index}`} className="text-xs text-muted-foreground">{index + 1}. {pathStep}</p>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
                                     {Array.isArray(debrief.actionSummary) && debrief.actionSummary.length > 0 && (
-                                      <div className="border border-border/30 bg-background/30 p-2">
-                                        <p className="mb-1 text-[0.65rem] text-muted-foreground">Flight Actions</p>
+                                      <div className="border border-border/30 bg-background/30 p-3">
+                                        <p className="mb-2 text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">Flight Actions</p>
                                         {debrief.actionSummary.slice(0, 8).map((item, index) => (
                                           <p key={`${item}-${index}`} className="text-xs text-muted-foreground">{item}</p>
                                         ))}
                                       </div>
                                     )}
 
-                                    <p className="font-rajdhani text-xs text-muted-foreground">Assessment: {performanceReview.summary}</p>
-                                    <div className="border border-border/30 bg-background/30 p-2">
-                                      <p className="mb-1 text-[0.65rem] text-muted-foreground">Recommendations</p>
+                                    <div className="border border-border/30 bg-background/30 p-3">
+                                      <p className="mb-2 text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">Assessment</p>
+                                      <p className="text-xs text-muted-foreground">{performanceReview.summary}</p>
+                                    </div>
+
+                                    <div className="border border-border/30 bg-background/30 p-3">
+                                      <p className="mb-2 text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">Recommendations</p>
                                       {performanceReview.recommendations.map((item) => (
                                         <p key={item} className="text-xs text-muted-foreground">- {item}</p>
                                       ))}
@@ -1158,11 +1382,30 @@ const Training = () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setStep((prev) => Math.max(0, prev - 1))} className="rounded border border-border px-4 py-2 font-orbitron text-xs text-muted-foreground">PREV</button>
-              <button type="button" onClick={goNext} className="rounded border border-border px-4 py-2 font-orbitron text-xs text-muted-foreground">NEXT</button>
-              <button type="submit" disabled={running || step < 5} className="rounded border border-primary px-4 py-2 font-orbitron text-xs text-primary">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep((prev) => Math.max(0, prev - 1))}
+                className="border-border font-orbitron text-xs tracking-[0.2em] uppercase text-muted-foreground"
+              >
+                PREV
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={goNext}
+                className="border-border font-orbitron text-xs tracking-[0.2em] uppercase text-muted-foreground"
+              >
+                NEXT
+              </Button>
+              <Button
+                type="submit"
+                disabled={running || step < 5}
+                variant="outline"
+                className="border-primary font-orbitron text-xs tracking-[0.2em] uppercase text-primary"
+              >
                 {running ? "PROCESSING TRAINING..." : "COMPLETE TRAINING"}
-              </button>
+              </Button>
             </div>
 
           {completionDebrief && (
@@ -1191,22 +1434,24 @@ const Training = () => {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => setPreviewOpen(true)}
                     disabled={!canGenerateReport}
-                    className="border border-border px-4 py-2 font-orbitron text-xs text-muted-foreground disabled:opacity-50"
+                    className="border-border font-orbitron text-xs tracking-[0.2em] uppercase text-muted-foreground"
                   >
                     PREVIEW REPORT
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={handleDownloadReport}
                     disabled={!canGenerateReport || generatingReport}
-                    className="border border-primary px-4 py-2 font-orbitron text-xs text-primary disabled:opacity-50"
+                    className="border-primary font-orbitron text-xs tracking-[0.2em] uppercase text-primary"
                   >
                     {generatingReport ? "GENERATING PDF..." : "DOWNLOAD PDF"}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

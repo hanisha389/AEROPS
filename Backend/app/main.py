@@ -1,5 +1,7 @@
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.db import init_db, SessionLocal
 from app.seed_data import seed
 from app.routes.access_code import router as access_code_router
@@ -12,6 +14,10 @@ from app.routes.documents import router as documents_router
 from app.routes.maintenance import router as maintenance_router
 
 app = FastAPI(title="AEROPS API", version="0.1.0")
+
+static_images_dir = Path(__file__).resolve().parent / "images"
+if static_images_dir.exists():
+    app.mount("/images", StaticFiles(directory=str(static_images_dir)), name="images")
 
 app.add_middleware(
     CORSMiddleware,

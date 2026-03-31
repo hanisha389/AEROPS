@@ -229,6 +229,14 @@ const AircraftDetail = () => {
     return componentStateClass(componentHealth[selectedPart]);
   }, [componentHealth, selectedPart]);
 
+  const diagramSrc = useMemo(() => {
+    const hasWingDamage = componentHealth.wings !== "Good";
+    const hasEngineDamage = componentHealth.engine !== "Good";
+    if (hasWingDamage) return "/aircraft_wings.svg";
+    if (hasEngineDamage) return "/aircraft_engine.svg";
+    return "/aircraft.svg";
+  }, [componentHealth]);
+
   const handleBlueprintImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget;
     if (image.dataset.fallbackApplied === "true") return;
@@ -429,7 +437,7 @@ const AircraftDetail = () => {
 
               <div className="relative mb-6 flex min-h-[28rem] flex-1 items-center justify-center rounded-lg border border-white/5 bg-black/40 p-3">
                 <img
-                  src="/aircraft.svg"
+                  src={diagramSrc}
                   alt="Aircraft diagram"
                   className="h-full w-full object-contain opacity-85"
                   loading="lazy"

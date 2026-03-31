@@ -144,6 +144,43 @@ def complete_training_workflow(
     now = datetime.utcnow().isoformat()
     created_document_ids: list[int] = []
 
+    debrief_input = payload.debrief
+    if debrief_input:
+        telemetry = debrief_input.telemetrySummary
+        telemetry_summary = "N/A"
+        if telemetry:
+            telemetry_summary = (
+                f"Speed {telemetry.speedMin or 0}-{telemetry.speedMax or 0} kts "
+                f"(avg {telemetry.speedAvg or 0}); "
+                f"Altitude avg {telemetry.altitudeAvg or 0} m, peak {telemetry.altitudeMax or 0} m; "
+                f"Heading {telemetry.headingRange or 'N/A'}"
+            )
+
+        debrief_document = create_document_from_template(
+            db,
+            template_key="training_debrief_report",
+            document_type="TRAINING_DEBRIEF_REPORT",
+            dynamic_fields={
+                "trainingType": payload.trainingType,
+                "duration": payload.duration,
+                "debriefSource": debrief_input.source or "N/A",
+                "performanceScore": debrief_input.score if debrief_input.score is not None else "N/A",
+                "performanceGrade": debrief_input.grade or "N/A",
+                "assessment": debrief_input.assessment or "N/A",
+                "recommendations": " | ".join(debrief_input.recommendations) or "None",
+                "pilotCallSigns": ", ".join([pilot.call_sign for pilot in pilots]) or "N/A",
+                "peakG": debrief_input.peakG if debrief_input.peakG is not None else "N/A",
+                "peakStress": debrief_input.peakStress if debrief_input.peakStress is not None else "N/A",
+                "peakHeartRate": debrief_input.peakHeartRate if debrief_input.peakHeartRate is not None else "N/A",
+                "peakFatigue": debrief_input.peakFatigue if debrief_input.peakFatigue is not None else "N/A",
+                "telemetrySummary": telemetry_summary,
+                "plannedRoute": " | ".join(debrief_input.plannedPath) or "N/A",
+                "actionSummary": " | ".join(debrief_input.actionSummary) or "N/A",
+            },
+            created_by_role=context.role,
+        )
+        created_document_ids.append(debrief_document.id)
+
     updated_aircraft_ids: list[str] = []
     for aircraft_id in payload.aircraftIds:
         pre_check = pre_checks_by_aircraft[aircraft_id]

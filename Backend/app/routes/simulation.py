@@ -62,6 +62,7 @@ TARGET_SPEED_KMH = {
 
 
 GRID_SIZE = 25
+GRID_MAX_RED_CELLS = 3
 GRID_MAX_LOADOUT = 5
 
 GRID_DEFAULT_BOUNDS = {
@@ -457,18 +458,35 @@ def grid_dijkstra(
     target_point: Coordinate,
     defense_radius_km: float,
 ):
-    dist = [[math.inf for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
-    prev = [[None for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    dist = [
+        [[math.inf for _ in range(GRID_MAX_RED_CELLS + 1)] for _ in range(GRID_SIZE)]
+        for _ in range(GRID_SIZE)
+    ]
+    prev = [
+        [[None for _ in range(GRID_MAX_RED_CELLS + 1)] for _ in range(GRID_SIZE)]
+        for _ in range(GRID_SIZE)
+    ]
 
     sr, sc = start_rc
     tr, tc = target_rc
 
-    dist[sr][sc] = 0.0
-    heap = [(0.0, sr, sc)]
+    start_red = 1 if zone_grid[sr][sc] == "red" else 0
+    if start_red > GRID_MAX_RED_CELLS:
+        return [], 0.0
+    dist[sr][sc][start_red] = 0.0
+    heap = [(0.0, sr, sc, start_red)]
+    best_end = (sr, sc, start_red)
+    best_end_distance = grid_haversine_km(
+        lat_grid[sr][sc],
+        lng_grid[sr][sc],
+        target_point.lat,
+        target_point.lng,
+    )
+    best_end_cost = 0.0
 
     while heap:
-        cost, r, c = heapq.heappop(heap)
-        if cost != dist[r][c]:
+        cost, r, c, red_count = heapq.heappop(heap)
+        if cost != dist[r][c][red_count]:
             continue
         if (r, c) == (tr, tc):
             break
@@ -482,6 +500,9 @@ def grid_dijkstra(
                     lat_grid[nr][nc],
                     lng_grid[nr][nc],
                 )
+                new_red_count = red_count + (1 if zone_grid[nr][nc] == "red" else 0)
+                if new_red_count > GRID_MAX_RED_CELLS:
+                    continue
                 distance_to_target = grid_haversine_km(
                     lat_grid[nr][nc],
                     lng_grid[nr][nc],
@@ -500,22 +521,33 @@ def grid_dijkstra(
                     defense_radius_km,
                 )
                 new_cost = cost + step
-                if new_cost < dist[nr][nc]:
-                    dist[nr][nc] = new_cost
-                    prev[nr][nc] = (r, c)
-                    heapq.heappush(heap, (new_cost, nr, nc))
+                if new_cost < dist[nr][nc][new_red_count]:
+                    dist[nr][nc][new_red_count] = new_cost
+                    prev[nr][nc][new_red_count] = (r, c, red_count)
+                    heapq.heappush(heap, (new_cost, nr, nc, new_red_count))
+                if distance_to_target < best_end_distance or (
+                    distance_to_target == best_end_distance and new_cost < best_end_cost
+                ):
+                    best_end_distance = distance_to_target
+                    best_end_cost = new_cost
+                    best_end = (nr, nc, new_red_count)
 
     path_cells = []
-    cur = (tr, tc)
-    if prev[tr][tc] is None and (tr, tc) != (sr, sc):
-        path_cells = [(sr, sc), (tr, tc)]
+    if any(dist[tr][tc][idx] < math.inf for idx in range(GRID_MAX_RED_CELLS + 1)):
+        target_red = min(
+            range(GRID_MAX_RED_CELLS + 1),
+            key=lambda idx: dist[tr][tc][idx],
+        )
+        cur = (tr, tc, target_red)
     else:
-        while cur is not None:
-            path_cells.append(cur)
-            if cur == (sr, sc):
-                break
-            cur = prev[cur[0]][cur[1]]
-        path_cells.reverse()
+        cur = best_end
+
+    while cur is not None:
+        path_cells.append((cur[0], cur[1]))
+        if (cur[0], cur[1]) == (sr, sc):
+            break
+        cur = prev[cur[0]][cur[1]][cur[2]]
+    path_cells.reverse()
 
     path_coords = [
         {"lat": lat_grid[r][c], "lng": lng_grid[r][c]} for r, c in path_cells
@@ -624,6 +656,30 @@ def grid_path_distance_km(path: list[dict]) -> float:
             path[idx]["lng"],
         )
     return total
+
+
+def grid_trim_path_by_red_limit(
+    path: list[dict],
+    lat_grid,
+    lng_grid,
+    zone_grid,
+    max_red_cells: int,
+):
+    if not path:
+        return []
+    red_count = 0
+    trimmed = []
+    for point in path:
+        row, col = grid_nearest_cell(lat_grid, lng_grid, Coordinate(**point))
+        zone = zone_grid[row][col]
+        if zone == "red":
+            red_count += 1
+            if red_count > max_red_cells:
+                break
+        trimmed.append(point)
+    if not trimmed:
+        trimmed.append(path[0])
+    return trimmed
 
 
 def grid_aircraft_speed_kmh(aircraft_key: str) -> float:
@@ -810,6 +866,13 @@ def grid_simulate(payload: SimulationGridRunRequest, db: Session = Depends(get_d
     routes = []
 
     direct = grid_direct_path(payload.start, payload.target)
+    direct = grid_trim_path_by_red_limit(
+        direct,
+        lat_grid,
+        lng_grid,
+        zone_grid,
+        GRID_MAX_RED_CELLS,
+    )
     direct_ratios = grid_zone_ratios_for_path(direct, lat_grid, lng_grid, zone_grid)
     direct_outcome = grid_route_outcome(attack_power, defense_power_value, pilot_count, direct_ratios)
     direct_success = direct_outcome["success"]

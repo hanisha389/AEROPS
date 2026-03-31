@@ -191,12 +191,37 @@ export interface AircraftPostTrainingCheckPayload {
   checklist: PostTrainingChecklistPayload;
 }
 
+export interface TrainingTelemetrySummaryPayload {
+  speedMin?: number;
+  speedAvg?: number;
+  speedMax?: number;
+  altitudeAvg?: number;
+  altitudeMax?: number;
+  headingRange?: string;
+}
+
+export interface TrainingDebriefPayload {
+  source: string;
+  score?: number;
+  grade?: string;
+  peakG?: number;
+  peakStress?: number;
+  peakHeartRate?: number;
+  peakFatigue?: number;
+  telemetrySummary?: TrainingTelemetrySummaryPayload;
+  plannedPath?: string[];
+  actionSummary?: string[];
+  assessment: string;
+  recommendations: string[];
+}
+
 export interface TrainingWorkflowPayload {
   pilotIds: number[];
   aircraftIds: string[];
   trainingType: "Maneuver" | "Dogfight" | "Precision Bombing";
   duration: string;
   notes: string;
+  debrief?: TrainingDebriefPayload;
   preTrainingChecks: AircraftTrainingCheckPayload[];
   postTrainingChecks: AircraftPostTrainingCheckPayload[];
   pilotMedicalReports: PilotMedicalReportPayload[];

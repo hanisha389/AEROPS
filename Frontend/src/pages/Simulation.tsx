@@ -186,13 +186,8 @@ const Simulation = () => {
     cells.map((cell) => ({ lat: cell.lat, lng: cell.lng, type: cell.zone }));
 
   const buildPresetSnapshot = (): SimulationGridPresetSnapshot => ({
-    team: team || null,
-    pilots: pilotPayload,
-    defense_type: defenseUnits[0]?.name ?? defenseType ?? null,
-    defense_count: totalDefenseCount,
-    defense_units: defenseUnits,
-    start,
-    target,
+    pilots: [],
+    defense_count: 0,
     zones: zonePayload(grid),
   });
 
@@ -500,39 +495,9 @@ const Simulation = () => {
     const snapshot = preset.snapshot;
     try {
       setError(null);
-      const response = await api.updateSimulationGridState(snapshot as SimulationGridState);
-      setTeam(snapshot.team ?? "");
-      const snapshotUnits = snapshot.defense_units?.length
-        ? snapshot.defense_units
-        : snapshot.defense_type
-          ? [{ name: snapshot.defense_type, count: snapshot.defense_count ?? 0 }]
-          : [];
-      setDefenseUnits(snapshotUnits);
-      setDefenseType(snapshotUnits[0]?.name ?? snapshot.defense_type ?? "");
-      setStart(snapshot.start ?? null);
-      setTarget(snapshot.target ?? null);
+      const response = await api.updateSimulationGridState({ zones: snapshot.zones } as SimulationGridState);
       setGrid(response.grid ?? []);
       setDefenseRadiusKm(response.defense_radius_km ?? 0);
-
-      const nextSetups: Record<number, PilotSetup> = {};
-      const selectedIds = (snapshot.pilots || []).map((pilot) => pilot.pilot_id);
-      (snapshot.pilots || []).forEach((pilot) => {
-        const nextCounts: Record<string, number> = {};
-        pilot.loadout?.forEach((item) => {
-          nextCounts[item.name] = item.quantity;
-        });
-        nextSetups[pilot.pilot_id] = {
-          pilotId: pilot.pilot_id,
-          aircraft: pilot.aircraft,
-          loadoutCounts: nextCounts,
-        };
-      });
-      setPilotSetups(nextSetups);
-      setSelectedPilotIds(selectedIds);
-
-      if (snapshot.start) {
-        await api.setSimulationBase(snapshot.start);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load preset");
     }
