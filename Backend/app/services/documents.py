@@ -12,10 +12,12 @@ DEFAULT_TEMPLATES = [
         "sections": ["Inspection Context", "Aircraft Checklist", "Readiness Summary"],
         "required_fields": [
             "aircraftId",
-            "fuelLevel",
+            "trainingType",
             "engineStatus",
-            "avionicsCheck",
-            "weaponSystems",
+            "wingsStatus",
+            "landingGearStatus",
+            "avionicsStatus",
+            "fuelSystemStatus",
             "overallStatus",
         ],
     },
@@ -25,10 +27,12 @@ DEFAULT_TEMPLATES = [
         "sections": ["Inspection Context", "Aircraft Checklist", "Damage and Maintenance"],
         "required_fields": [
             "aircraftId",
-            "fuelLevel",
+            "trainingType",
             "engineStatus",
-            "avionicsCheck",
-            "weaponSystems",
+            "wingsStatus",
+            "landingGearStatus",
+            "avionicsStatus",
+            "fuelSystemStatus",
             "overallStatus",
             "damageObserved",
             "maintenanceRequired",
@@ -45,6 +49,7 @@ DEFAULT_TEMPLATES = [
             "status",
             "fatigueLevel",
             "injuries",
+            "injuryStatus",
             "fitForDuty",
             "remarks",
         ],
@@ -75,16 +80,32 @@ def _split(value: str | None) -> list[str]:
 
 
 def ensure_default_templates(db: Session) -> None:
-    existing_keys = {item[0] for item in db.query(DocumentTemplate.key).all()}
     for template in DEFAULT_TEMPLATES:
-        if template["key"] in existing_keys:
+        sections = _join(template["sections"])
+        required_fields = _join(template["required_fields"])
+        existing = (
+            db.query(DocumentTemplate).filter(DocumentTemplate.key == template["key"]).first()
+        )
+        if existing:
+            updated = False
+            if existing.title != template["title"]:
+                existing.title = template["title"]
+                updated = True
+            if existing.fixed_sections != sections:
+                existing.fixed_sections = sections
+                updated = True
+            if existing.required_fields != required_fields:
+                existing.required_fields = required_fields
+                updated = True
+            if updated:
+                db.add(existing)
             continue
         db.add(
             DocumentTemplate(
                 key=template["key"],
                 title=template["title"],
-                fixed_sections=_join(template["sections"]),
-                required_fields=_join(template["required_fields"]),
+                fixed_sections=sections,
+                required_fields=required_fields,
             )
         )
     db.flush()

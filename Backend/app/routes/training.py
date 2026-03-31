@@ -10,14 +10,79 @@ from app.dependencies.roles import (
     get_request_context,
     require_roles,
 )
-from app.models.aircraft import Aircraft
-from app.models.maintenance import AircraftMaintenanceLog
+from app.models.aircraft import Aircraft, AircraftComponentStatus, AircraftIssue
+from app.models.maintenance import AircraftMaintenanceLog, MaintenanceEntry
 from app.models.pilot import Pilot, PilotMedical, PilotMedicalDetails, PilotMedicalLog, PilotMission
 from app.models.training import PilotTrainingLog
 from app.schemas.training import TrainingRunResponse, TrainingWorkflowRequest, TrainingWorkflowResponse
 from app.services.documents import create_document_from_template, ensure_default_templates
 
 router = APIRouter(prefix="/training", tags=["training"])
+
+COMPONENT_STATE_RANK = {"Good": 0, "Warning": 1, "Critical": 2}
+
+
+def _merge_component_state(current_state: str, next_state: str) -> str:
+    return next_state if COMPONENT_STATE_RANK[next_state] > COMPONENT_STATE_RANK[current_state] else current_state
+
+
+def _maintenance_issue_type(component: str) -> str:
+    if component == "engine":
+        return "Engine"
+    if component == "avionics":
+        return "Avionics"
+    return "Structural"
+
+
+def _derive_component_findings(pre_check, post_check) -> dict[str, tuple[str, str, str]]:
+    findings: dict[str, tuple[str, str, str]] = {
+        "engine": ("Good", "LOW", "No issues detected"),
+        "wings": ("Good", "LOW", "No issues detected"),
+        "avionics": ("Good", "LOW", "No issues detected"),
+        "fuel": ("Good", "LOW", "No issues detected"),
+        "landingGear": ("Good", "LOW", "No issues detected"),
+    }
+
+    def set_component(component: str, state: str, severity: str, reason: str):
+        current_state, current_severity, current_reason = findings[component]
+        merged_state = _merge_component_state(current_state, state)
+        if merged_state == current_state:
+            return
+        merged_severity = severity if state == merged_state else current_severity
+        merged_reason = reason if state == merged_state else current_reason
+        findings[component] = (merged_state, merged_severity, merged_reason)
+
+    if pre_check.fuelSystemStatus in {"CRITICAL", "ISSUE"} or post_check.fuelSystemStatus in {"CRITICAL", "ISSUE"}:
+        set_component("fuel", "Critical", "HIGH", "Fuel system issue detected during training checks")
+    elif pre_check.fuelSystemStatus == "LOW" or post_check.fuelSystemStatus == "LOW":
+        set_component("fuel", "Warning", "MEDIUM", "Fuel system reported LOW during training checks")
+
+    if post_check.engineStatus == "ISSUE":
+        set_component("engine", "Critical", "HIGH", "Engine issue detected in post-training inspection")
+    elif pre_check.engineStatus == "ISSUE":
+        set_component("engine", "Warning", "MEDIUM", "Engine issue flagged in pre-training inspection")
+
+    if post_check.avionicsStatus == "ISSUE":
+        set_component("avionics", "Critical", "HIGH", "Avionics issue detected in post-training inspection")
+    elif pre_check.avionicsStatus == "ISSUE":
+        set_component("avionics", "Warning", "MEDIUM", "Avionics issue flagged in pre-training inspection")
+
+    if post_check.wingsStatus == "DAMAGE" or post_check.damageObserved == "YES":
+        set_component("wings", "Critical", "HIGH", "Wing damage detected in post-training inspection")
+    elif pre_check.wingsStatus == "DAMAGE":
+        set_component("wings", "Warning", "MEDIUM", "Wing issue flagged in pre-training inspection")
+
+    if post_check.landingGearStatus == "ISSUE":
+        set_component("landingGear", "Critical", "HIGH", "Landing gear issue detected in post-training inspection")
+    elif pre_check.landingGearStatus == "ISSUE":
+        set_component("landingGear", "Warning", "MEDIUM", "Landing gear issue flagged in pre-training inspection")
+
+    if post_check.maintenanceRequired == "YES":
+        set_component("landingGear", "Critical", "HIGH", "Post-training maintenance required")
+    elif post_check.overallStatus == "NOT READY" or pre_check.overallStatus == "NOT READY":
+        set_component("landingGear", "Warning", "MEDIUM", "Aircraft marked NOT READY during checks")
+
+    return findings
 
 @router.post(
     "/run",
@@ -91,10 +156,11 @@ def complete_training_workflow(
             dynamic_fields={
                 "aircraftId": aircraft_id,
                 "trainingType": payload.trainingType,
-                "fuelLevel": pre_check.fuelLevel,
                 "engineStatus": pre_check.engineStatus,
-                "avionicsCheck": pre_check.avionicsCheck,
-                "weaponSystems": pre_check.weaponSystems,
+                "wingsStatus": pre_check.wingsStatus,
+                "landingGearStatus": pre_check.landingGearStatus,
+                "avionicsStatus": pre_check.avionicsStatus,
+                "fuelSystemStatus": pre_check.fuelSystemStatus,
                 "overallStatus": pre_check.overallStatus,
             },
             created_by_role=context.role,
@@ -118,10 +184,11 @@ def complete_training_workflow(
             dynamic_fields={
                 "aircraftId": aircraft_id,
                 "trainingType": payload.trainingType,
-                "fuelLevel": post_check.fuelLevel,
                 "engineStatus": post_check.engineStatus,
-                "avionicsCheck": post_check.avionicsCheck,
-                "weaponSystems": post_check.weaponSystems,
+                "wingsStatus": post_check.wingsStatus,
+                "landingGearStatus": post_check.landingGearStatus,
+                "avionicsStatus": post_check.avionicsStatus,
+                "fuelSystemStatus": post_check.fuelSystemStatus,
                 "overallStatus": post_check.overallStatus,
                 "damageObserved": post_check.damageObserved,
                 "maintenanceRequired": post_check.maintenanceRequired,
@@ -140,12 +207,107 @@ def complete_training_workflow(
             )
         )
 
+        component_findings = _derive_component_findings(pre_check, post_check)
+        has_critical_component = False
+        has_warning_component = False
+
+        for component, (state, severity, reason) in component_findings.items():
+            component_row = db.query(AircraftComponentStatus).filter(
+                AircraftComponentStatus.aircraft_id == aircraft_id,
+                AircraftComponentStatus.component == component,
+            ).first()
+            if not component_row:
+                component_row = AircraftComponentStatus(
+                    aircraft_id=aircraft_id,
+                    component=component,
+                    status=state,
+                    notes=reason,
+                )
+                db.add(component_row)
+            else:
+                component_row.status = state
+                component_row.notes = reason
+
+            if state == "Warning":
+                has_warning_component = True
+
+            if state not in {"Warning", "Critical"}:
+                continue
+
+            if state == "Critical":
+                has_critical_component = True
+
+            issue_severity = "HIGH" if state == "Critical" else "MEDIUM"
+            issue = db.query(AircraftIssue).filter(
+                AircraftIssue.aircraft_id == aircraft_id,
+                AircraftIssue.component == component,
+                AircraftIssue.status.in_(["Open", "Assigned"]),
+            ).order_by(AircraftIssue.id.asc()).first()
+
+            if issue:
+                issue.severity = issue_severity
+                issue.description = reason
+                if issue.status != "Assigned":
+                    issue.status = "Open"
+            else:
+                db.add(
+                    AircraftIssue(
+                        aircraft_id=aircraft_id,
+                        component=component,
+                        severity=issue_severity,
+                        description=reason,
+                        status="Open",
+                        created_at=now,
+                    )
+                )
+
+            issue_type = _maintenance_issue_type(component)
+            existing_entry = db.query(MaintenanceEntry).filter(
+                MaintenanceEntry.aircraft_id == aircraft_id,
+                MaintenanceEntry.issue_type == issue_type,
+                MaintenanceEntry.status == "OPEN",
+                MaintenanceEntry.engineer_notes.contains(component),
+            ).first()
+            if state == "Critical" and not existing_entry:
+                db.add(
+                    MaintenanceEntry(
+                        aircraft_id=aircraft_id,
+                        issue_type=issue_type,
+                        severity="HIGH",
+                        status="OPEN",
+                        engineer_notes=f"Auto-created from training post-check: {component} - {reason}",
+                        created_at=now,
+                    )
+                )
+                db.add(
+                    AircraftMaintenanceLog(
+                        aircraft_id=aircraft_id,
+                        log_type="MAINTENANCE_ENTRY",
+                        summary=f"Auto-reported critical {component} issue from training ({payload.trainingType})",
+                        document_id=None,
+                        created_at=now,
+                    )
+                )
+
+            if state in {"Warning", "Critical"}:
+                db.add(
+                    AircraftMaintenanceLog(
+                        aircraft_id=aircraft_id,
+                        log_type="TRAINING_CRITICAL_ALERT",
+                        summary=f"{state} {component} status reported to engineering workflow",
+                        document_id=post_document.id,
+                        created_at=now,
+                    )
+                )
+
         aircraft = aircraft_by_id[aircraft_id]
         aircraft_ready = (
             pre_check.overallStatus == "READY"
             and post_check.overallStatus == "READY"
             and post_check.damageObserved == "NO"
             and post_check.maintenanceRequired == "NO"
+            and not has_critical_component
+            and not has_warning_component
         )
         aircraft.health_status = "READY" if aircraft_ready else "MAINTENANCE"
         aircraft.last_maintenance = now.split("T")[0]
@@ -157,6 +319,11 @@ def complete_training_workflow(
         fit_for_duty = medical_input.fitForDuty == "YES"
         injuries = medical_input.injuries
         injury_text = "None" if not injuries else ", ".join([f"{item.part} ({item.severity})" for item in injuries])
+        # Derive a concise injury status so the document template can capture severity at a glance
+        if not injuries:
+            injury_status = "NONE"
+        else:
+            injury_status = "MAJOR" if any(item.severity == "MAJOR" for item in injuries) else "MINOR"
 
         pilot_medical = pilot.medical
         if not pilot_medical:
@@ -230,6 +397,7 @@ def complete_training_workflow(
                 "status": pilot.status,
                 "fatigueLevel": medical_input.fatigueLevel,
                 "injuries": injury_text,
+                "injuryStatus": injury_status,
                 "fitForDuty": medical_input.fitForDuty,
                 "remarks": medical_details.clearance_remarks,
             },

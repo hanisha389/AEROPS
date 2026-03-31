@@ -151,16 +151,23 @@ export interface TrainingRunPayload {
 }
 
 export interface TrainingChecklistPayload {
-  fuelLevel: "OK" | "LOW" | "CRITICAL";
   engineStatus: "OK" | "ISSUE";
-  avionicsCheck: "OK" | "ISSUE";
-  weaponSystems: "OK" | "NOT REQUIRED";
+  wingsStatus: "OK" | "DAMAGE";
+  landingGearStatus: "OK" | "ISSUE";
+  avionicsStatus: "OK" | "ISSUE";
+  fuelSystemStatus: "OK" | "LOW" | "CRITICAL" | "ISSUE";
   overallStatus: "READY" | "NOT READY";
 }
 
 export interface PostTrainingChecklistPayload extends TrainingChecklistPayload {
   damageObserved: "YES" | "NO";
   maintenanceRequired: "YES" | "NO";
+}
+
+export interface EngineerIssueAssignmentPayload {
+  issueId: number;
+  aircraftId: string;
+  engineerId: number;
 }
 
 export interface PilotMedicalReportPayload {
@@ -262,13 +269,18 @@ export interface MapCoordinate {
 
 export interface AirspaceZonePayload {
   countryName: string;
-  center: MapCoordinate;
-  radiusKm: number;
+  center?: MapCoordinate;
+  radiusKm?: number;
+  polygon?: MapCoordinate[];
   zoneType: "friendly" | "neutral" | "enemy";
 }
 
 export interface AirspaceZone extends AirspaceZonePayload {
   id: number;
+  geometryType: "circle" | "polygon";
+  center?: MapCoordinate | null;
+  radiusKm?: number | null;
+  polygon: MapCoordinate[];
 }
 
 export interface EnemyAircraftUnitPayload {
@@ -358,6 +370,74 @@ export interface SimulationFinalResult {
   fuelRemaining: number;
 }
 
+export interface SimulationStrategyMetrics {
+  distance: number;
+  time: number;
+  fuel: number;
+  cost: number;
+  risk: number;
+  fuel_margin: number;
+}
+
+export interface SimulationWhatIfResult {
+  return_probability: number;
+}
+
+export interface SimulationWhatIf {
+  interception: SimulationWhatIfResult;
+  reinforcements: SimulationWhatIfResult;
+  bad_weather: SimulationWhatIfResult;
+  low_fuel: SimulationWhatIfResult;
+}
+
+export interface SimulationStrategyRawMetrics {
+  distance_km: number;
+  time_hours: number;
+  fuel_used: number;
+  mission_cost: number;
+  fuel_margin_km: number;
+  effective_speed_kmh: number;
+  effective_fuel_rate: number;
+  effective_range_km: number;
+  selected_aircraft_id: string;
+  aircraft_score: number;
+  weapon_score: number;
+  total_score: number;
+  survival_probability: number;
+}
+
+export interface SimulationStrategy {
+  name: "LOW_RISK" | "FUEL_EFFICIENT" | "COST_EFFICIENT";
+  path: MapCoordinate[];
+  metrics: SimulationStrategyMetrics;
+  what_if: SimulationWhatIf;
+  raw_metrics: SimulationStrategyRawMetrics;
+}
+
+export interface SimulationAircraftLoadout {
+  aircraftId: string;
+  aircraftName: string;
+  baseWeightKg: number;
+  payloadWeightKg: number;
+  totalWeightKg: number;
+  maxTakeoffWeightKg: number;
+  ordnanceLimitKg: number;
+  weightUtilizationPercent: number;
+  effectiveSpeedKmh: number;
+  effectiveFuelRate: number;
+  effectiveRangeKm: number;
+  aircraftScore: number;
+  weaponScore: number;
+  totalScore: number;
+  survivalProbability: number;
+}
+
+export interface SimulationTargetProfile {
+  targetType: string;
+  speedKmh: number;
+  defenseLevel: number;
+}
+
 export interface SimulationRunResponse {
   baseLocation: MapCoordinate;
   interceptLocation: MapCoordinate;
@@ -378,6 +458,9 @@ export interface SimulationRunResponse {
   finalResult: SimulationFinalResult;
   metrics: SimulationMetrics;
   eventLog: SimulationEventLog[];
+  strategies: SimulationStrategy[];
+  targetProfile: SimulationTargetProfile;
+  aircraftLoadout: SimulationAircraftLoadout[];
 }
 
 export const api = {
@@ -397,6 +480,8 @@ export const api = {
     client.post(`/engineers/${engineerId}/logs`, payload).then((res) => res.data),
   updateEngineerLogStatus: (engineerId: number, logId: number, completionStatus: string) =>
     client.put(`/engineers/${engineerId}/logs/${logId}/status`, { completionStatus }).then((res) => res.data),
+  assignIssueToEngineer: (payload: EngineerIssueAssignmentPayload) =>
+    client.post("/engineers/assign-issue", payload).then((res) => res.data),
   getOpenIssues: (): Promise<OpenIssue[]> => client.get("/engineers/open-issues").then((res) => res.data),
 
   getAircrafts: () => client.get("/aircraft").then((res) => res.data),

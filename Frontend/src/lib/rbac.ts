@@ -15,6 +15,7 @@ const routeRoleMap: Record<string, UserRole[]> = {
   "/aircraft": ["ADMIN_COMMANDER", "PILOT", "ENGINEER"],
   "/aircraft/:id": ["ADMIN_COMMANDER", "PILOT", "ENGINEER"],
   "/training": ["ADMIN_COMMANDER", "PILOT"],
+  "/training/simulator": ["ADMIN_COMMANDER", "PILOT"],
   "/simulation": ["ADMIN_COMMANDER"],
   "/simulation/run": ["ADMIN_COMMANDER"],
   "/documents": ["ADMIN_COMMANDER", "PILOT", "ENGINEER"],

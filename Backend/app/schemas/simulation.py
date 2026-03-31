@@ -9,16 +9,19 @@ class Coordinate(BaseModel):
 
 class AirspaceZoneCreate(BaseModel):
     countryName: str = Field(..., min_length=2)
-    center: Coordinate
-    radiusKm: float = Field(..., gt=0)
+    center: Coordinate | None = None
+    radiusKm: float | None = Field(default=None, gt=0)
+    polygon: list[Coordinate] = Field(default_factory=list)
     zoneType: Literal["friendly", "neutral", "enemy"] = "neutral"
 
 
 class AirspaceZoneRead(BaseModel):
     id: int
     countryName: str
-    center: Coordinate
-    radiusKm: float
+    geometryType: Literal["circle", "polygon"]
+    center: Coordinate | None = None
+    radiusKm: float | None = None
+    polygon: list[Coordinate] = Field(default_factory=list)
     zoneType: Literal["friendly", "neutral", "enemy"]
 
 
@@ -65,6 +68,74 @@ class SimulationTimelineStep(BaseModel):
 class SimulationEvent(BaseModel):
     timeSeconds: float
     description: str
+
+
+class SimulationStrategyMetrics(BaseModel):
+    distance: float
+    time: float
+    fuel: float
+    cost: float
+    risk: float
+    fuel_margin: float
+
+
+class SimulationStrategyRawMetrics(BaseModel):
+    distance_km: float
+    time_hours: float
+    fuel_used: float
+    mission_cost: float
+    fuel_margin_km: float
+    effective_speed_kmh: float
+    effective_fuel_rate: float
+    effective_range_km: float
+    selected_aircraft_id: str
+    aircraft_score: float
+    weapon_score: float
+    total_score: float
+    survival_probability: float
+
+
+class SimulationWhatIfResult(BaseModel):
+    return_probability: float
+
+
+class SimulationWhatIf(BaseModel):
+    interception: SimulationWhatIfResult
+    reinforcements: SimulationWhatIfResult
+    bad_weather: SimulationWhatIfResult
+    low_fuel: SimulationWhatIfResult
+
+
+class SimulationStrategy(BaseModel):
+    name: Literal["LOW_RISK", "FUEL_EFFICIENT", "COST_EFFICIENT"]
+    path: list[Coordinate] = Field(default_factory=list)
+    metrics: SimulationStrategyMetrics
+    what_if: SimulationWhatIf
+    raw_metrics: SimulationStrategyRawMetrics
+
+
+class SimulationAircraftLoadout(BaseModel):
+    aircraftId: str
+    aircraftName: str
+    baseWeightKg: float
+    payloadWeightKg: float
+    totalWeightKg: float
+    maxTakeoffWeightKg: float
+    ordnanceLimitKg: float
+    weightUtilizationPercent: float
+    effectiveSpeedKmh: float
+    effectiveFuelRate: float
+    effectiveRangeKm: float
+    aircraftScore: float
+    weaponScore: float
+    totalScore: float
+    survivalProbability: float
+
+
+class SimulationTargetProfile(BaseModel):
+    targetType: str
+    speedKmh: float
+    defenseLevel: float
 
 
 class SimulationTrajectoryMetrics(BaseModel):
@@ -133,3 +204,6 @@ class SimulationRunResponse(BaseModel):
     finalResult: SimulationFinalResult
     metrics: SimulationMetrics
     eventLog: list[SimulationEvent]
+    strategies: list[SimulationStrategy] = Field(default_factory=list)
+    targetProfile: SimulationTargetProfile
+    aircraftLoadout: list[SimulationAircraftLoadout] = Field(default_factory=list)
