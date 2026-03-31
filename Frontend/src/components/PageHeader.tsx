@@ -7,21 +7,24 @@ const PageHeader = ({ title, backTo = '/menu' }: { title: string; backTo?: strin
 
   return (
     <motion.div
-      className="flex items-center gap-4 border-b border-border/30 px-6 py-4"
-      initial={{ y: -20, opacity: 0 }}
+      className="flex items-center gap-4 mb-6"
+      initial={{ y: -10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.3 }}
     >
       <button
         onClick={() => navigate(backTo)}
-        className="flex items-center gap-2 font-rajdhani text-sm tracking-wider text-muted-foreground transition-colors hover:text-primary"
+        className="flex h-8 w-8 items-center justify-center border border-border/50 bg-background/50 text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
       >
         <ArrowLeft className="h-4 w-4" />
-        BACK
       </button>
-      <h1 className="font-orbitron text-lg tracking-[0.2em] text-primary neon-glow">
-        {title}
-      </h1>
+
+      <div>
+        <h1 className="font-orbitron text-xl font-bold tracking-[0.25em] text-foreground">
+          {title}
+        </h1>
+        <div className="mt-1 h-[1px] w-12 bg-primary/60" />
+      </div>
     </motion.div>
   );
 };

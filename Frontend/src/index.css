@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,65 +6,92 @@
 
 @layer base {
   :root {
-    /* Muted dark space background overlay */
-    --background: 221 39% 11%;
-    --foreground: 220 14% 96%;
+    /* ─── Deep military dark ─── */
+    --background: 220 40% 8%;
+    --foreground: 210 20% 94%;
 
-    /* Professional clean panel styles */
-    --card: 221 39% 13%; 
-    --card-foreground: 220 14% 96%;
+    /* ─── Panel system ─── */
+    --card: 220 38% 10%;
+    --card-foreground: 210 20% 94%;
 
-    --popover: 221 39% 13%;
-    --popover-foreground: 220 14% 96%;
+    --popover: 220 38% 10%;
+    --popover-foreground: 210 20% 94%;
 
-    /* Sparing Primary usage */
-    --primary: 186 100% 50%;
-    --primary-foreground: 221 39% 11%;
-    
-    --secondary: 215 28% 17%;
-    --secondary-foreground: 186 100% 50%;
+    /* ─── Color semantics (NOT decorative) ─── */
+    /* Cyan = Active/Selected signal only */
+    --primary: 188 100% 48%;
+    --primary-foreground: 220 40% 8%;
 
-    --muted: 215 28% 17%;
-    --muted-foreground: 215 16% 47%;
+    /* Secondary */
+    --secondary: 218 30% 14%;
+    --secondary-foreground: 210 16% 65%;
 
-    --accent: 186 100% 50%;
-    --accent-foreground: 221 39% 11%;
+    /* Muted */
+    --muted: 218 30% 13%;
+    --muted-foreground: 215 14% 46%;
 
-    --success: 142 71% 45%;
-    --danger: 348 83% 47%;
+    /* Accent = same as primary for selections */
+    --accent: 188 100% 48%;
+    --accent-foreground: 220 40% 8%;
 
-    --destructive: 348 83% 47%;
+    /* Semantic colors */
+    --success: 142 68% 42%;
+    --danger: 4 80% 52%;
+    --warning: 38 95% 52%;
+
+    --destructive: 4 80% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 28% 17%;
-    --input: 215 28% 17%;
-    --ring: 186 100% 50%;
+    /* Borders */
+    --border: 218 28% 15%;
+    --input: 218 28% 15%;
+    --ring: 188 100% 48%;
 
-    --radius: 0.75rem;
+    --radius: 0.25rem;
 
-    --sidebar-background: 221 39% 11%;
-    --sidebar-foreground: 220 14% 96%;
-    --sidebar-primary: 186 100% 50%;
-    --sidebar-primary-foreground: 221 39% 11%;
-    --sidebar-accent: 215 28% 17%;
-    --sidebar-accent-foreground: 186 100% 50%;
-    --sidebar-border: 215 28% 17%;
-    --sidebar-ring: 186 100% 50%;
+    --sidebar-background: 220 40% 8%;
+    --sidebar-foreground: 210 20% 94%;
+    --sidebar-primary: 188 100% 48%;
+    --sidebar-primary-foreground: 220 40% 8%;
+    --sidebar-accent: 218 30% 14%;
+    --sidebar-accent-foreground: 188 100% 48%;
+    --sidebar-border: 218 28% 15%;
+    --sidebar-ring: 188 100% 48%;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', 'Space Grotesk', sans-serif;
+    line-height: 1.6;
+    letter-spacing: 0.01em;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Rajdhani', sans-serif;
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+  }
+
+  h5,
+  h6 {
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 0.04em;
   }
 }
 
@@ -72,25 +99,330 @@
   .font-orbitron {
     font-family: 'Orbitron', sans-serif;
   }
-  .font-rajdhani {
-    font-family: 'Rajdhani', sans-serif;
+
+  .font-space {
+    font-family: 'Space Grotesk', sans-serif;
   }
+
   .font-inter {
     font-family: 'Inter', sans-serif;
   }
+
+  /* Legacy font support */
+  .font-rajdhani {
+    font-family: 'Space Grotesk', sans-serif;
+  }
 }
 
-/* Custom scrollbar */
+/* ─── Custom scrollbar ─── */
 ::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
+
 ::-webkit-scrollbar-track {
-  background: hsl(221 39% 11%);
+  background: hsl(220 40% 8%);
 }
+
 ::-webkit-scrollbar-thumb {
-  background: hsl(215 16% 47% / 0.5);
+  background: hsl(218 28% 20% / 0.7);
   border-radius: 2px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(215 16% 47% / 0.8);
+  background: hsl(188 100% 48% / 0.35);
+}
+
+/* ─── Military Panel System ─── */
+.mil-panel {
+  background: hsl(220 38% 10% / 0.82);
+  border: 1px solid hsl(218 28% 20% / 0.6);
+  border-radius: 2px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.mil-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid hsl(218 28% 18% / 0.8);
+}
+
+.mil-panel-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: hsl(215 14% 46%);
+}
+
+/* ─── Signal dot (status indicator) ─── */
+.signal-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.signal-dot.green {
+  background: hsl(142 68% 42%);
+  box-shadow: 0 0 6px hsl(142 68% 42% / 0.7);
+}
+
+.signal-dot.red {
+  background: hsl(4 80% 52%);
+  box-shadow: 0 0 6px hsl(4 80% 52% / 0.7);
+}
+
+.signal-dot.amber {
+  background: hsl(38 95% 52%);
+  box-shadow: 0 0 6px hsl(38 95% 52% / 0.6);
+}
+
+.signal-dot.cyan {
+  background: hsl(188 100% 48%);
+  box-shadow: 0 0 6px hsl(188 100% 48% / 0.7);
+}
+
+/* ─── Glow effects ─── */
+.glow-cyan {
+  text-shadow: 0 0 14px hsl(188 100% 48% / 0.55);
+}
+
+.glow-green {
+  text-shadow: 0 0 12px hsl(142 68% 42% / 0.6);
+}
+
+.glow-red {
+  text-shadow: 0 0 12px hsl(4 80% 52% / 0.6);
+}
+
+/* ─── Legacy class aliases ─── */
+.neon-glow {
+  @apply glow-cyan;
+}
+
+.neon-border {
+  box-shadow: 0 0 8px hsl(188 100% 48% / 0.2), inset 0 0 8px hsl(188 100% 48% / 0.05);
+}
+
+.neon-border-strong {
+  box-shadow: 0 0 14px hsl(188 100% 48% / 0.4), inset 0 0 10px hsl(188 100% 48% / 0.1);
+}
+
+/* ─── Grid background texture ─── */
+.radar-grid {
+  background-image:
+    linear-gradient(hsl(218 28% 20% / 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(218 28% 20% / 0.15) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* ─── Radar sweep animation ─── */
+@keyframes radar-sweep {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes radar-pulse {
+  0% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+@keyframes blink-status {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes scan-line {
+  0% {
+    top: 0%;
+  }
+
+  100% {
+    top: 100%;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes damage-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 6px hsl(4 80% 52% / 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 18px hsl(4 80% 52% / 0.9);
+  }
+}
+
+.animate-radar-sweep {
+  animation: radar-sweep 4s linear infinite;
+  transform-origin: 50% 100%;
+}
+
+.animate-radar-pulse {
+  animation: radar-pulse 2s ease-out infinite;
+}
+
+.animate-blink {
+  animation: blink-status 2s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out forwards;
+}
+
+.animate-damage-pulse {
+  animation: damage-pulse 1.5s ease-in-out infinite;
+}
+
+/* ─── Tactical button base ─── */
+.tac-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  border: 1px solid hsl(218 28% 22%);
+  background: hsl(218 28% 12% / 0.7);
+  color: hsl(215 14% 60%);
+  transition: all 0.18s ease;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.tac-btn:hover {
+  border-color: hsl(188 100% 48% / 0.45);
+  color: hsl(188 100% 72%);
+  background: hsl(188 100% 48% / 0.06);
+}
+
+.tac-btn.active {
+  border-color: hsl(188 100% 48% / 0.6);
+  color: hsl(188 100% 72%);
+  background: hsl(188 100% 48% / 0.08);
+}
+
+.tac-btn.danger {
+  border-color: hsl(4 80% 52% / 0.5);
+  color: hsl(4 80% 65%);
+  background: hsl(4 80% 52% / 0.06);
+}
+
+.tac-btn.success {
+  border-color: hsl(142 68% 42% / 0.5);
+  color: hsl(142 68% 55%);
+  background: hsl(142 68% 42% / 0.06);
+}
+
+/* ─── Status colors shorthand ─── */
+.text-success {
+  color: hsl(142 68% 48%);
+}
+
+.text-danger {
+  color: hsl(4 80% 60%);
+}
+
+.text-warning {
+  color: hsl(38 95% 56%);
+}
+
+.bg-success\/5 {
+  background: hsl(142 68% 42% / 0.05);
+}
+
+.bg-success\/10 {
+  background: hsl(142 68% 42% / 0.1);
+}
+
+.border-success\/10 {
+  border-color: hsl(142 68% 42% / 0.1);
+}
+
+.border-success\/20 {
+  border-color: hsl(142 68% 42% / 0.2);
+}
+
+/* ─── Divider ─── */
+.mil-divider {
+  border: 0;
+  height: 1px;
+  background: hsl(218 28% 18% / 0.8);
+  margin: 0;
+}
+
+/* ─── Leaflet overrides for dark map ─── */
+.leaflet-container {
+  background: #0d1117 !important;
+}
+
+.leaflet-tile {
+  filter: brightness(0.6) saturate(0.5) hue-rotate(180deg);
+}
+
+/* ─── Accordion animations ─── */
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+
+  to {
+    height: 0;
+  }
+}
+
+/* ─── Ping keyframe for component markers ─── */
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
 }

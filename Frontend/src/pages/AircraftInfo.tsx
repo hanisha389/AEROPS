@@ -46,7 +46,7 @@ const AircraftInfo = () => {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.05, duration: 0.25 }}
             >
-              <Panel 
+              <Panel
                 className="group p-5 cursor-pointer hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all flex flex-col h-full justify-between"
                 onClick={() => navigate(`/aircraft/${ac.id}`)}
               >
@@ -54,7 +54,7 @@ const AircraftInfo = () => {
                   <h3 className="font-rajdhani font-bold text-xl text-gray-100 uppercase tracking-widest">{ac.name}</h3>
                   <p className="font-inter text-xs text-gray-400 mt-1 tracking-wider uppercase font-medium">{ac.model}</p>
                 </div>
-                
+
                 <div className="flex justify-between items-end">
                   <div className="flex flex-col">
                     <span className="font-inter text-[10px] text-gray-500 uppercase tracking-widest mb-1">Assigned Pilot</span>
@@ -62,7 +62,7 @@ const AircraftInfo = () => {
                   </div>
                   <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 group-hover:text-white">
-                      <path d="m9 18 6-6-6-6"/>
+                      <path d="m9 18 6-6-6-6" />
                     </svg>
                   </div>
                 </div>

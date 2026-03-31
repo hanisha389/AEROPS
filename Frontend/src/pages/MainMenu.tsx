@@ -1,21 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import BackgroundLayout from '@/components/BackgroundLayout';
-import { getCurrentRole, canAccessRoute, ROLE_LABELS } from '@/lib/rbac';
-import { Shield, Wrench, Plane, GraduationCap, MonitorPlay, FileText } from 'lucide-react';
+import { getCurrentRole, canAccessRoute } from '@/lib/rbac';
+import { Target, Wrench, Plane, GraduationCap, MonitorPlay } from 'lucide-react';
 
 const menuItems = [
-  { label: 'PILOT INFO', path: '/pilots', icon: Shield },
+  { label: 'PILOT INFO', path: '/pilots', icon: Target },
   { label: 'ENGINEER INFO', path: '/engineers', icon: Wrench },
   { label: 'AIRCRAFT INFO', path: '/aircraft', icon: Plane },
   { label: 'TRAINING', path: '/training', icon: GraduationCap },
   { label: 'SIMULATION', path: '/simulation', icon: MonitorPlay },
-  { label: 'DOCUMENTS', path: '/documents', icon: FileText },
 ];
 
 const MainMenu = () => {
-  const [hovered, setHovered] = useState<number | null>(null);
   const role = getCurrentRole();
   const navigate = useNavigate();
 
@@ -26,72 +24,121 @@ const MainMenu = () => {
 
   return (
     <BackgroundLayout>
-      <div className="flex min-h-screen">
-        {/* Left menu */}
-        <div className="flex w-80 flex-col justify-center border-r border-border/30 p-8">
-          <motion.h1
-            className="mb-2 font-orbitron text-2xl font-bold tracking-[0.3em] text-primary neon-glow"
-            initial={{ x: -30, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            AEROPS
-          </motion.h1>
-          <motion.p
-            className="mb-12 font-rajdhani text-xs tracking-[0.15em] text-muted-foreground"
-            initial={{ x: -30, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            MAIN MENU
-          </motion.p>
+      {/* Full-height flex row that overrides the default column layout */}
+      <div
+        className="flex flex-row"
+        style={{ minHeight: 'calc(100vh - 48px)', margin: '-2rem -3rem', padding: 0 }}
+      >
+        {/* ─── Sidebar ─── */}
+        <div
+          style={{
+            width: '220px',
+            minWidth: '220px',
+            background: 'hsl(220 42% 6% / 0.85)',
+            borderRight: '1px solid hsl(188 100% 48% / 0.1)',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '40px 24px',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          {/* Logo */}
+          <div style={{ marginBottom: '32px' }}>
+            <h1
+              className="font-orbitron font-bold tracking-[0.35em]"
+              style={{ fontSize: '22px', color: 'hsl(188 100% 72%)', lineHeight: 1 }}
+            >
+              AEROPS
+            </h1>
+            <p
+              className="font-space uppercase tracking-[0.2em]"
+              style={{ fontSize: '8px', color: 'hsl(215 14% 40%)', marginTop: '4px' }}
+            >
+              MAIN MENU
+            </p>
+          </div>
 
-          <p className="mb-4 font-rajdhani text-[0.65rem] tracking-[0.18em] text-muted-foreground">
-            ACCESS PROFILE: {ROLE_LABELS[role]}
-          </p>
-
-          <nav className="flex flex-col gap-1">
+          {/* Nav items */}
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {visibleItems.map((item, i) => {
               const Icon = item.icon;
               return (
                 <motion.button
                   key={item.path}
-                  className={`group flex items-center gap-4 border-l-2 px-4 py-3 text-left font-rajdhani text-lg font-medium tracking-wider transition-all duration-200 ${
-                    hovered === i
-                      ? 'border-primary bg-primary/5 text-primary neon-glow'
-                      : 'border-transparent text-muted-foreground hover:border-primary/50 hover:text-primary/80'
-                  }`}
-                  onMouseEnter={() => setHovered(i)}
-                  onMouseLeave={() => setHovered(null)}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.07 }}
                   onClick={() => navigate(item.path)}
-                  initial={{ x: -40, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ duration: 0.4, delay: 0.15 + i * 0.08 }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '10px 12px',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    borderRadius: '2px',
+                    transition: 'all 0.18s ease',
+                    color: 'hsl(215 14% 55%)',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.color = 'hsl(188 100% 72%)';
+                    (e.currentTarget as HTMLButtonElement).style.background = 'hsl(188 100% 48% / 0.06)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.color = 'hsl(215 14% 55%)';
+                    (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                  }}
                 >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
+                  <Icon
+                    size={15}
+                    style={{ flexShrink: 0, color: 'hsl(188 100% 55%)' }}
+                  />
+                  <span
+                    className="font-space uppercase tracking-[0.12em]"
+                    style={{ fontSize: '11px', fontWeight: 500 }}
+                  >
+                    {item.label}
+                  </span>
                 </motion.button>
               );
             })}
           </nav>
         </div>
 
-        {/* Right side overlay */}
-        <div className="flex flex-1 items-center justify-center">
+        {/* ─── Main area ─── */}
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <motion.div
-            className="text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6, duration: 0.8 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            style={{ textAlign: 'center' }}
           >
-            <p className="font-orbitron text-xs tracking-[0.3em] text-muted-foreground/40">
+            <p
+              className="font-space uppercase tracking-[0.35em]"
+              style={{ fontSize: '11px', color: 'hsl(188 100% 62% / 0.5)', marginBottom: '6px' }}
+            >
               SYSTEM STATUS: ONLINE
             </p>
-            <p className="mt-2 font-rajdhani text-xs tracking-widest text-muted-foreground/30">
+            <p
+              className="font-space uppercase tracking-[0.2em]"
+              style={{ fontSize: '9px', color: 'hsl(215 14% 35%)' }}
+            >
               CLEARANCE LEVEL: ALPHA
             </p>
-            <p className="mt-1 font-rajdhani text-xs tracking-widest text-muted-foreground/20">
-              {new Date().toISOString().split('T')[0]}
+            <p
+              className="font-orbitron"
+              style={{ fontSize: '9px', color: 'hsl(215 14% 30%)', marginTop: '4px', letterSpacing: '0.15em' }}
+            >
+              {new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC
             </p>
           </motion.div>
         </div>

@@ -5,17 +5,29 @@ interface StatusBadgeProps {
   variant?: "badge" | "plain";
 }
 
-const statusStyles: Record<"active" | "injured" | "offline", string> = {
-  active: "border-green-500/50 bg-green-500/10 text-green-400",
-  injured: "border-red-500/50 bg-red-500/10 text-red-400",
-  offline: "border-amber-500/50 bg-amber-500/10 text-amber-400",
-};
-
 const normalizeStatus = (value: string): "active" | "injured" | "offline" => {
   const status = value.toLowerCase();
-  if (status.includes("injur")) return "injured";
-  if (status.includes("offline") || status.includes("leave") || status.includes("holiday")) return "offline";
+  if (status.includes("injur") || status.includes("critical") || status.includes("danger")) return "injured";
+  if (status.includes("offline") || status.includes("leave") || status.includes("hold") || status.includes("warning")) return "offline";
   return "active";
+};
+
+const badgeClasses = {
+  active: "border-success/30 bg-success/10 text-success",
+  injured: "border-danger/30 bg-danger/10 text-danger",
+  offline: "border-warning/30 bg-warning/10 text-warning",
+};
+
+const dotClasses = {
+  active: "bg-success shadow-[0_0_6px_hsl(var(--success)/0.7)]",
+  injured: "bg-danger shadow-[0_0_6px_hsl(var(--danger)/0.7)]",
+  offline: "bg-warning shadow-[0_0_6px_hsl(var(--warning)/0.6)]",
+};
+
+const textClasses = {
+  active: "text-success",
+  injured: "text-danger",
+  offline: "text-warning",
 };
 
 const StatusBadge = ({ status, align = "left", compact = false, variant = "badge" }: StatusBadgeProps) => {
@@ -23,17 +35,11 @@ const StatusBadge = ({ status, align = "left", compact = false, variant = "badge
   const wrapperClass =
     align === "center" ? "justify-center" : align === "right" ? "justify-end" : "justify-start";
 
-  const plainStyles: Record<"active" | "injured" | "offline", string> = {
-    active: "text-green-400",
-    injured: "text-red-400",
-    offline: "text-amber-400",
-  };
-
   if (variant === "plain") {
     return (
       <div className={`flex ${wrapperClass}`}>
-        <span className={`inline-flex items-center gap-1.5 font-rajdhani ${compact ? "text-sm" : "text-base"} ${plainStyles[normalized]}`}>
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+        <span className={`inline-flex items-center gap-2 font-space tracking-widest uppercase font-semibold ${compact ? "text-[10px]" : "text-xs"} ${textClasses[normalized]}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${dotClasses[normalized]}`} />
           {status}
         </span>
       </div>
@@ -43,12 +49,11 @@ const StatusBadge = ({ status, align = "left", compact = false, variant = "badge
   return (
     <div className={`flex ${wrapperClass}`}>
       <span
-        className={`inline-flex items-center gap-1 border px-2 py-1 font-orbitron tracking-[0.08em] ${
-          compact ? "text-[10px]" : "text-xs"
-        } ${statusStyles[normalized]}`}
+        className={`inline-flex items-center gap-2 border px-2 py-1 font-space tracking-[0.15em] uppercase font-semibold ${compact ? "text-[9px]" : "text-[10px]"
+          } ${badgeClasses[normalized]}`}
       >
-        <span className="h-1.5 w-1.5 rounded-full bg-current" />
-        {status.toUpperCase()}
+        <span className={`h-1.5 w-1.5 rounded-full ${dotClasses[normalized]}`} />
+        {status}
       </span>
     </div>
   );

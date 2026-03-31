@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
 import IAFRankInsignia from "@/components/IAFRankInsignia";
 import { Panel } from "@/components/ui/custom/Panel";
+import { Activity, Clock } from "lucide-react";
 
 interface Pilot {
   id: number;
@@ -14,6 +15,7 @@ interface Pilot {
   rank: string;
   image: string;
   status?: string;
+  callSign?: string;
 }
 
 const getHighResImage = (url: string) => {
@@ -37,46 +39,97 @@ const PilotInfo = () => {
 
   return (
     <BackgroundLayout>
-      <PageHeader title="PILOT PERSONNEL" />
-      <div className="p-6">
-        <div className="mb-4 flex justify-end">
+      <PageHeader title="PERSONNEL ROSTER" />
+      <div className="w-full flex-1">
+        <div className="mb-6 flex justify-between items-center border-b border-border/40 pb-4">
+          <div className="flex gap-4">
+            <div className="px-4 py-2 border border-border/50 bg-background/50">
+              <span className="font-space text-[10px] tracking-widest text-muted-foreground uppercase block mb-1">Total Active</span>
+              <span className="font-orbitron font-bold text-xl text-primary">{pilots.length}</span>
+            </div>
+            <div className="px-4 py-2 border border-border/50 bg-background/50">
+              <span className="font-space text-[10px] tracking-widest text-muted-foreground uppercase block mb-1">Squadron Status</span>
+              <span className="font-orbitron font-bold text-xl text-success">READY</span>
+            </div>
+          </div>
           <button
             onClick={handleAddPilot}
-            className="rounded bg-accent/10 border border-accent/30 hover:bg-accent/20 px-4 py-2 font-rajdhani font-semibold text-sm tracking-[0.05em] text-accent transition-colors"
+            className="tac-btn"
           >
             + REGISTER PERSONNEL
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {pilots.map((pilot, index) => (
-            <motion.div
-              key={pilot.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05, duration: 0.25 }}
-            >
-              <Panel className="group flex h-full min-h-[26.5rem] flex-col p-0 cursor-pointer overflow-hidden hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-300 sm:min-h-[29rem]" onClick={() => navigate(`/pilots/${pilot.id}`)}>
-                <div className="h-[17rem] w-full overflow-hidden bg-black/50 sm:h-[19rem]">
-                  <img
-                    src={getHighResImage(pilot.image)}
-                    alt={pilot.name}
-                    className="h-full w-full object-cover object-[50%_8%] opacity-80 group-hover:opacity-100 transition-opacity duration-300"
-                  />
-                </div>
-                <div className="flex flex-1 flex-col justify-end p-4 bg-gradient-to-t from-background/90 to-transparent">
-                  <p className="line-clamp-1 font-rajdhani font-bold text-[1.35rem] leading-tight text-gray-100 group-hover:text-white transition-colors">{pilot.name}</p>
-                  <div className="mt-1 flex items-center justify-between gap-2 mb-2">
-                    <p className="line-clamp-1 font-inter text-xs text-muted-foreground uppercase tracking-wider">{pilot.rank}</p>
-                    <IAFRankInsignia rank={pilot.rank} short />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {pilots.map((pilot, index) => {
+            const isInjured = pilot.status?.toLowerCase().includes('injur');
+            const isOffline = pilot.status?.toLowerCase().includes('leave');
+            const statusColor = isInjured ? 'bg-danger' : isOffline ? 'bg-warning' : 'bg-success';
+
+            return (
+              <motion.div
+                key={pilot.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05, duration: 0.3 }}
+              >
+                <Panel
+                  className="group flex flex-col p-0 cursor-pointer overflow-hidden border-border/30 hover:border-primary/50 transition-all duration-300 transform-gpu hover:-translate-y-1 relative"
+                  onClick={() => navigate(`/pilots/${pilot.id}`)}
+                >
+                  {/* Status Strip Top */}
+                  <div className={`h-1 w-full ${statusColor}`} />
+
+                  {/* Image wrapper */}
+                  <div className="relative h-[280px] w-full overflow-hidden bg-background">
+                    <img
+                      src={getHighResImage(pilot.image)}
+                      alt={pilot.name}
+                      className="h-full w-full object-cover object-[50%_15%] opacity-70 group-hover:opacity-100 transition-opacity duration-500 mix-blend-luminosity group-hover:mix-blend-normal"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent opacity-90" />
+
+                    {/* Badge Overlay */}
+                    <div className="absolute top-3 left-3">
+                      <StatusBadge status={pilot.status || "Active"} variant="badge" />
+                    </div>
+
+                    <div className="absolute top-3 right-3 opacity-60 group-hover:opacity-100 transition-opacity">
+                      <IAFRankInsignia rank={pilot.rank} short />
+                    </div>
                   </div>
-                  <div className="mt-auto">
-                    <StatusBadge status={pilot.status || "Active"} variant="plain" compact />
+
+                  {/* Content below image (overlaps slightly) */}
+                  <div className="relative z-10 flex flex-col p-4 pt-0 -mt-20">
+                    <p className="font-orbitron font-bold text-lg text-foreground group-hover:text-primary transition-colors tracking-widest uppercase">
+                      {pilot.name}
+                    </p>
+                    <p className="font-space text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-4">
+                      {pilot.rank} {pilot.callSign ? `// "${pilot.callSign}"` : ''}
+                    </p>
+
+                    <hr className="mil-divider mb-4 group-hover:border-primary/30 transition-colors" />
+
+                    {/* Telemetry Footer */}
+                    <div className="flex justify-between items-center text-muted-foreground group-hover:text-foreground transition-colors">
+                      <div className="flex items-center gap-2">
+                        <Activity size={12} className={isInjured ? 'text-danger' : 'text-success'} />
+                        <span className="font-space text-[9px] uppercase tracking-widest">
+                          {isInjured ? 'MED-HOLD' : 'CLR-FLIGHT'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 opacity-60">
+                        <Clock size={10} />
+                        <span className="font-space text-[9px] tabular-nums tracking-wider uppercase bg-secondary px-1 py-0.5 rounded-sm">
+                          LOG: 400H
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </Panel>
-            </motion.div>
-          ))}
+                </Panel>
+              </motion.div>
+            )
+          })}
         </div>
       </div>
     </BackgroundLayout>

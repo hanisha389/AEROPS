@@ -4,7 +4,6 @@ import BackgroundLayout from "@/components/BackgroundLayout";
 import PageHeader from "@/components/PageHeader";
 import { api, type AircraftMaintenanceHistoryItem } from "@/lib/api";
 import { getCurrentRole } from "@/lib/rbac";
-import { Panel } from "@/components/ui/custom/Panel";
 
 type ComponentState = "Good" | "Warning" | "Critical";
 type ComponentKey = "engine" | "wings" | "avionics" | "fuel" | "landingGear";
@@ -78,12 +77,8 @@ const isAssignmentRole = (role: string) => role === "ADMIN_COMMANDER" || role ==
 
 const mapIssueSeverityToState = (severity: string): ComponentState => {
   const normalized = severity.toUpperCase();
-  if (normalized === "HIGH" || normalized === "CRITICAL") {
-    return "Critical";
-  }
-  if (normalized === "MEDIUM" || normalized === "WARNING") {
-    return "Warning";
-  }
+  if (normalized === "HIGH" || normalized === "CRITICAL") return "Critical";
+  if (normalized === "MEDIUM" || normalized === "WARNING") return "Warning";
   return "Good";
 };
 
@@ -93,53 +88,20 @@ const mergeState = (current: ComponentState, next: ComponentState): ComponentSta
 };
 
 const normalizeComponentKey = (value: string): ComponentKey | null => {
-  const normalized = normalizeComponentName(value);
-  if (normalized.includes("landing") || normalized.includes("gear")) {
-    return "landingGear";
-  }
-  if (normalized.includes("avionic")) {
-    return "avionics";
-  }
-  if (normalized.includes("engine")) {
-    return "engine";
-  }
-  if (normalized.includes("wing")) {
-    return "wings";
-  }
-  if (normalized.includes("fuel")) {
-    return "fuel";
-  }
+  const normalized = value.toLowerCase().replace(/[\s_-]+/g, "");
+  if (normalized.includes("landing") || normalized.includes("gear")) return "landingGear";
+  if (normalized.includes("avionic")) return "avionics";
+  if (normalized.includes("engine")) return "engine";
+  if (normalized.includes("wing")) return "wings";
+  if (normalized.includes("fuel")) return "fuel";
   return null;
 };
 
-const componentStateClass = (value: ComponentState): string => {
-  if (value === "Critical") {
-    return "text-danger font-bold";
-  }
-  if (value === "Warning") {
-    return "text-yellow-400 font-bold";
-  }
-  return "text-success font-bold";
+const stateColor = (state: ComponentState) => {
+  if (state === "Critical") return { dot: 'hsl(4 80% 60%)', glow: 'hsl(4 80% 52%)' };
+  if (state === "Warning") return  { dot: 'hsl(38 95% 56%)', glow: 'hsl(38 95% 52%)' };
+  return { dot: 'hsl(142 68% 48%)', glow: 'hsl(142 68% 42%)' };
 };
-
-const componentMarkerClass = (value: ComponentState): string => {
-  if (value === "Critical") {
-    return "border-danger bg-danger/80 animate-pulse";
-  }
-  if (value === "Warning") {
-    return "border-yellow-400 bg-yellow-400/80 animate-pulse";
-  }
-  return "border-success bg-success/60";
-};
-
-const normalizeComponentName = (value: string): string => value.toLowerCase().replace(/[\s_-]+/g, "");
-
-const DataRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <div className="flex flex-col mb-3">
-    <span className="text-gray-400 font-inter text-xs uppercase tracking-wider mb-1">{label}</span>
-    <span className="text-gray-100 font-inter text-sm font-medium">{value}</span>
-  </div>
-);
 
 const AircraftDetail = () => {
   const role = getCurrentRole();
@@ -170,10 +132,7 @@ const AircraftDetail = () => {
   };
 
   const loadEngineers = async () => {
-    if (!canAssignIssues) {
-      setEngineerOptions([]);
-      return;
-    }
+    if (!canAssignIssues) { setEngineerOptions([]); return; }
     const engineers = await api.getEngineers();
     setEngineerOptions(engineers);
   };
@@ -196,13 +155,7 @@ const AircraftDetail = () => {
   }, [aircraft]);
 
   const openIssuesByComponent = useMemo(() => {
-    const grouped: Record<ComponentKey, number> = {
-      engine: 0,
-      wings: 0,
-      avionics: 0,
-      fuel: 0,
-      landingGear: 0,
-    };
+    const grouped: Record<ComponentKey, number> = { engine: 0, wings: 0, avionics: 0, fuel: 0, landingGear: 0 };
     for (const issue of aircraft?.openIssues || []) {
       const component = normalizeComponentKey(issue.component);
       if (component) grouped[component] += 1;
@@ -215,10 +168,6 @@ const AircraftDetail = () => {
     return aircraft.openIssues.length > 0 ? "NOT READY" : "READY";
   }, [aircraft]);
 
-  const statusClass = useMemo(() => {
-    return componentStateClass(componentHealth[selectedPart]);
-  }, [componentHealth, selectedPart]);
-
   const handleBlueprintImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget;
     if (image.dataset.fallbackApplied === "true") return;
@@ -229,7 +178,6 @@ const AircraftDetail = () => {
   const saveAircraft = async (event: FormEvent) => {
     event.preventDefault();
     if (!aircraft) return;
-
     const updated = await api.updateAircraft(aircraft.id, {
       id: aircraft.id,
       name: aircraft.name,
@@ -239,7 +187,6 @@ const AircraftDetail = () => {
       assignedPilots: assignedPilot ? [assignedPilot] : [],
       missions: [],
     });
-
     setAircraft(updated);
     void loadMaintenance();
   };
@@ -247,19 +194,11 @@ const AircraftDetail = () => {
   const assignIssue = async (issueId: number, issueAircraftId: string, currentStatus: string) => {
     if (!canAssignIssues) return;
     const selectedEngineer = assignmentByIssue[issueId];
-    if (!selectedEngineer) {
-      window.alert("Select an engineer before assigning this issue.");
-      return;
-    }
-
+    if (!selectedEngineer) { window.alert("Select an engineer before assigning this issue."); return; }
     setAssigningIssueId(issueId);
     setAssignmentMessage(null);
     try {
-      await api.assignIssueToEngineer({
-        issueId,
-        aircraftId: issueAircraftId,
-        engineerId: Number(selectedEngineer),
-      });
+      await api.assignIssueToEngineer({ issueId, aircraftId: issueAircraftId, engineerId: Number(selectedEngineer) });
       setAssignmentMessage(currentStatus === "Assigned" ? "Issue reassigned successfully." : "Issue assigned successfully.");
       await loadAircraft();
       await loadMaintenance();
@@ -271,211 +210,474 @@ const AircraftDetail = () => {
   if (!aircraft) {
     return (
       <BackgroundLayout>
-        <PageHeader title="AIRCRAFT DETAILS" backTo="/aircraft" />
-        <div className="p-6 font-inter text-muted-foreground text-center">Loading aircraft database...</div>
+        <PageHeader title="AIRCRAFT DIAGNOSTICS" backTo="/aircraft" />
+        <div className="flex justify-center items-center h-64">
+          <div
+            className="font-space tracking-[0.2em] animate-pulse"
+            style={{ fontSize: '11px', color: 'hsl(188 100% 55%)', border: '1px solid hsl(188 100% 48% / 0.2)', background: 'hsl(188 100% 48% / 0.05)', padding: '12px 24px', textTransform: 'uppercase' }}
+          >
+            ESTABLISHING TELEMETRY LINK...
+          </div>
+        </div>
       </BackgroundLayout>
     );
   }
 
+  const selectedColor = stateColor(componentHealth[selectedPart]);
+
   return (
     <BackgroundLayout>
       <PageHeader title="AIRCRAFT DIAGNOSTICS" backTo="/aircraft" />
-      <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
-        <header className="mb-2">
-          <h1 className="text-3xl font-rajdhani font-bold text-gray-200 uppercase tracking-wider">
+
+      {/* ── Aircraft header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div>
+          <h1
+            className="font-orbitron font-bold uppercase"
+            style={{ fontSize: '28px', letterSpacing: '0.08em', color: 'hsl(210 20% 96%)', marginBottom: '4px' }}
+          >
             {aircraft.name}
           </h1>
-          <p className="text-gray-400 font-inter text-sm mt-1">ID: {aircraft.id} | MODEL: {aircraft.model}</p>
-        </header>
+          <p
+            className="font-space uppercase"
+            style={{ fontSize: '10px', letterSpacing: '0.2em', color: 'hsl(215 14% 45%)' }}
+          >
+            ID: {aircraft.id} · MODEL: {aircraft.model}
+          </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p className="font-space uppercase" style={{ fontSize: '8px', letterSpacing: '0.2em', color: 'hsl(215 14% 40%)', marginBottom: '4px' }}>FLEET STATUS</p>
+          <div
+            className="font-orbitron font-bold uppercase tracking-widest"
+            style={{
+              fontSize: '14px',
+              color: derivedStatus === 'READY' ? 'hsl(142 68% 55%)' : 'hsl(4 80% 60%)',
+            }}
+          >
+            {derivedStatus}
+          </div>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* Overview Panel */}
-            <Panel className="p-6">
-              <form onSubmit={saveAircraft} className="flex flex-col gap-4">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-4">
-                  <div className="flex flex-col w-full md:w-1/2">
-                    <label className="text-xs text-gray-400 font-inter uppercase tracking-widest mb-2">Assigned Pilot</label>
-                    <select 
-                      className="bg-black/30 border border-white/10 rounded-md px-3 py-2 text-sm text-gray-200 font-inter focus:border-accent/50 outline-none transition-colors" 
-                      value={assignedPilot} 
+      {/* ── Two-column layout ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px', alignItems: 'start' }}>
+
+        {/* ── Left column ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          {/* Mission Assignment panel */}
+          <div style={{ border: '1px solid hsl(218 28% 18%)', background: 'hsl(220 40% 8% / 0.7)' }}>
+            <div style={{ padding: '10px 16px', borderBottom: '1px solid hsl(218 28% 15%)' }}>
+              <span className="font-space uppercase tracking-widest" style={{ fontSize: '9px', color: 'hsl(215 14% 45%)' }}>MISSION ASSIGNMENT</span>
+            </div>
+            <div style={{ padding: '16px' }}>
+              <form onSubmit={saveAircraft}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="font-space uppercase" style={{ fontSize: '8px', letterSpacing: '0.2em', color: 'hsl(215 14% 42%)', display: 'block', marginBottom: '6px' }}>
+                      ASSIGNED PILOT
+                    </label>
+                    <select
+                      style={{
+                        width: '100%',
+                        background: 'hsl(220 42% 7%)',
+                        border: '1px solid hsl(218 28% 22%)',
+                        color: 'hsl(210 20% 88%)',
+                        padding: '8px 12px',
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: '13px',
+                        outline: 'none',
+                        cursor: 'pointer',
+                      }}
+                      value={assignedPilot}
                       onChange={(e) => setAssignedPilot(e.target.value)}
                     >
-                      <option value="">Unassigned</option>
+                      <option value="">-- UNASSIGNED --</option>
                       {pilotOptions.map((pilot) => (
-                        <option key={pilot.id} value={pilot.callSign}>{pilot.callSign} ({pilot.name})</option>
+                        <option key={pilot.id} value={pilot.callSign}>
+                          {pilot.callSign} ({pilot.name})
+                        </option>
                       ))}
                     </select>
                   </div>
-                  
-                  <div className="flex flex-col items-start md:items-end">
-                    <span className="text-xs text-gray-400 font-inter uppercase tracking-widest mb-1">Status</span>
-                    <span className="font-rajdhani font-bold text-xl text-white">
-                      {derivedStatus}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="flex justify-end">
-                  <button type="submit" className="bg-accent/10 hover:bg-accent/20 border border-accent/40 text-accent font-rajdhani font-bold text-sm tracking-widest px-6 py-2 rounded transition-colors">
-                    UPDATE CONFIGURATION
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '8px 20px',
+                      border: '1px solid hsl(188 100% 48% / 0.45)',
+                      background: 'hsl(188 100% 48% / 0.08)',
+                      color: 'hsl(188 100% 70%)',
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      letterSpacing: '0.18em',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      transition: 'all 0.18s ease',
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'hsl(188 100% 48% / 0.16)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'hsl(188 100% 48% / 0.08)'; }}
+                  >
+                    UPDATE CONFIG
                   </button>
                 </div>
               </form>
-            </Panel>
-
-            {/* Open Issues Panel */}
-            <Panel className="p-6">
-              <h3 className="text-lg font-rajdhani font-medium text-gray-300 border-b border-white/5 pb-2 mb-4 uppercase">
-                Active Diagnostic Issues
-              </h3>
-              {assignmentMessage && <p className="mb-4 text-sm text-success bg-success/10 p-2 rounded border border-success/20">{assignmentMessage}</p>}
-              
-              {aircraft.openIssues && aircraft.openIssues.length > 0 ? (
-                <div className="space-y-3">
-                  {aircraft.openIssues.map((issue) => (
-                    <div key={issue.id} className="bg-black/20 border border-white/5 p-4 rounded-lg flex flex-col gap-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-rajdhani font-bold text-lg text-gray-200 uppercase">{issue.component}</p>
-                          <p className="font-inter text-sm text-gray-400 mt-1">{issue.description || "No detailed description provided."}</p>
-                        </div>
-                        <span className={`text-xs font-bold uppercase tracking-widest px-2 py-1 rounded bg-white/10`}>
-                          {issue.severity}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-1">
-                        <span className="text-xs text-gray-500 font-inter uppercase">STATUS: {issue.status}</span>
-                        
-                        {canAssignIssues && (
-                          <div className="flex gap-2 items-center">
-                            <select
-                              className="bg-background/80 border border-white/10 rounded px-2 py-1 text-xs text-gray-300 font-inter outline-none focus:border-accent/40"
-                              value={assignmentByIssue[issue.id] || ""}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                setAssignmentByIssue((prev) => ({ ...prev, [issue.id]: value }));
-                              }}
-                            >
-                              <option value="">Assign Engineer</option>
-                              {engineerOptions.map((engineer) => (
-                                <option key={engineer.id} value={String(engineer.id)}>
-                                  {engineer.employeeId} - {engineer.name}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => assignIssue(issue.id, issue.aircraftId, issue.status)}
-                              disabled={assigningIssueId === issue.id}
-                              className="bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-inter text-gray-200 px-3 py-1 rounded transition-colors disabled:opacity-50"
-                            >
-                              {assigningIssueId === issue.id ? "..." : (issue.status === "Assigned" ? "REASSIGN" : "ASSIGN")}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-success/5 border border-success/10 p-4 rounded-lg flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-success"></div>
-                  <p className="font-inter text-sm text-success">All systems nominal. No open diagnostic issues reported.</p>
-                </div>
-              )}
-            </Panel>
-            
-            {/* Maintenance History */}
-            <Panel className="p-6">
-              <h3 className="text-lg font-rajdhani font-medium text-gray-300 border-b border-white/5 pb-2 mb-4 uppercase">
-                Maintenance Logs
-              </h3>
-              {maintenanceEntries.length === 0 ? (
-                <p className="text-sm font-inter text-gray-400">No previous maintenance history logged.</p>
-              ) : (
-                <div className="space-y-3">
-                  {maintenanceEntries.map((entry) => (
-                    <div key={entry.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-lg flex justify-between items-center group hover:bg-white/[0.04] transition-colors">
-                      <div className="flex flex-col">
-                        <span className="font-rajdhani font-medium text-gray-200 text-sm">{entry.logType.replace(/_/g, " ")}</span>
-                        <span className="font-inter text-gray-400 text-xs mt-1">{entry.summary || "Standard maintenance procedure"}</span>
-                      </div>
-                      <span className="text-xs text-gray-500 font-inter tabular-nums">{new Date(entry.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Panel>
-            
+            </div>
           </div>
 
-          <div className="lg:col-span-1">
-            {/* Blueprint Overview Panel */}
-            <Panel className="p-6 sticky top-6">
-              <h3 className="text-lg font-rajdhani font-medium text-gray-300 border-b border-white/5 pb-2 mb-4 uppercase flex justify-between items-center">
-                System Schematic
-                <span className="text-[10px] text-accent tracking-widest px-2 py-1 bg-accent/10 rounded">LIVE</span>
-              </h3>
-              
-              <div className="relative bg-black/40 rounded-lg p-2 border border-white/5 mb-6 aspect-square max-h-80 mx-auto flex items-center justify-center">
-                <img
-                  src="/aircraft.svg"
-                  alt="Aircraft diagram"
-                  className="w-full h-full object-contain opacity-80"
-                  loading="lazy"
-                  onError={handleBlueprintImageError}
-                />
-                {COMPONENT_KEYS.map((component) => {
-                  const position = COMPONENT_MARKER_POSITIONS[component];
-                  const state = componentHealth[component];
-                  const hasIssue = openIssuesByComponent[component] > 0;
-                  const isSelected = selectedPart === component;
-                  return (
-                    <div key={component} className="absolute" style={{ top: position.top, left: position.left }}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPart(component)}
-                        className={`relative flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full transition-all hover:scale-110 shadow-xl ${componentMarkerClass(state)}`}
-                        title={`${COMPONENT_LABELS[component]}: ${state}`}
-                      >
-                        {isSelected && <span className="absolute inset-0 rounded-full border-2 border-white/80 animate-ping shadow-[0_0_15px_rgba(255,255,255,0.5)]"></span>}
-                        <span className={`block h-4 w-4 rounded-full border-2 border-white/90 shadow-lg bg-current`}></span>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              <div className="bg-black/20 rounded-lg p-4 border border-white/5">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="font-inter text-xs text-gray-400 uppercase tracking-widest">Selected System</span>
-                  <span className={`text-xs px-2 py-1 rounded font-bold`}>
-                    {componentHealth[selectedPart].toUpperCase()}
-                  </span>
-                </div>
-                <h4 className="font-rajdhani text-2xl font-bold text-gray-100 mb-2">{COMPONENT_LABELS[selectedPart]}</h4>
-                <p className="font-inter text-sm text-gray-400 line-clamp-2 min-h-10">
-                  {componentHealth[selectedPart] === 'Good' 
-                    ? `The ${COMPONENT_LABELS[selectedPart]} system is operating within optimal parameters.` 
-                    : `Diagnostic alert detected in ${COMPONENT_LABELS[selectedPart]}. Check active issues for details.`}
+          {/* Active Diagnostic Issues */}
+          <div style={{ border: '1px solid hsl(218 28% 18%)', background: 'hsl(220 40% 8% / 0.7)' }}>
+            <div style={{ padding: '10px 16px', borderBottom: '1px solid hsl(218 28% 15%)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="font-space uppercase tracking-widest" style={{ fontSize: '9px', color: 'hsl(215 14% 45%)' }}>ACTIVE DIAGNOSTIC ISSUES</span>
+              {aircraft.openIssues.length > 0 && (
+                <span className="font-space" style={{ fontSize: '9px', color: 'hsl(4 80% 60%)', letterSpacing: '0.1em' }}>
+                  {aircraft.openIssues.length} open
+                </span>
+              )}
+            </div>
+            <div style={{ padding: '16px' }}>
+              {assignmentMessage && (
+                <p
+                  className="font-space uppercase tracking-wider"
+                  style={{ fontSize: '10px', color: 'hsl(142 68% 55%)', background: 'hsl(142 68% 42% / 0.08)', border: '1px solid hsl(142 68% 42% / 0.2)', padding: '8px 12px', marginBottom: '12px' }}
+                >
+                  {assignmentMessage}
                 </p>
-                
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  {COMPONENT_KEYS.map((component) => (
-                    <button
-                      key={component}
-                      type="button"
-                      onClick={() => setSelectedPart(component)}
-                      className={`text-xs font-inter py-2 rounded transition-colors ${selectedPart === component ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-gray-400'}`}
-                    >
-                      {COMPONENT_LABELS[component]}
-                    </button>
-                  ))}
+              )}
+              {aircraft.openIssues && aircraft.openIssues.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {aircraft.openIssues.map((issue) => {
+                    const isCritical = issue.severity.toUpperCase() === 'CRITICAL' || issue.severity.toUpperCase() === 'HIGH';
+                    const isAssigned = issue.status === "Assigned";
+                    return (
+                      <div
+                        key={issue.id}
+                        style={{
+                          position: 'relative',
+                          border: `1px solid ${isCritical ? 'hsl(4 80% 52% / 0.3)' : 'hsl(38 95% 52% / 0.2)'}`,
+                          background: isCritical ? 'hsl(4 80% 52% / 0.04)' : 'hsl(38 95% 52% / 0.03)',
+                          padding: '12px 14px 12px 18px',
+                        }}
+                      >
+                        {/* Severity strip */}
+                        <div style={{
+                          position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px',
+                          background: isCritical ? 'hsl(4 80% 55%)' : 'hsl(38 95% 55%)',
+                        }} />
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                          <div>
+                            <p
+                              className="font-orbitron font-bold uppercase"
+                              style={{ fontSize: '12px', letterSpacing: '0.12em', color: 'hsl(210 20% 92%)', marginBottom: '3px' }}
+                            >
+                              {issue.component}
+                            </p>
+                            <p className="font-inter" style={{ fontSize: '11px', color: 'hsl(215 14% 52%)' }}>
+                              {issue.description || 'No detailed description.'}
+                            </p>
+                          </div>
+                          <span
+                            className="font-space uppercase tracking-widest"
+                            style={{
+                              fontSize: '9px',
+                              border: `1px solid ${isCritical ? 'hsl(4 80% 52% / 0.35)' : 'hsl(38 95% 52% / 0.3)'}`,
+                              color: isCritical ? 'hsl(4 80% 62%)' : 'hsl(38 95% 60%)',
+                              padding: '3px 10px',
+                              flexShrink: 0,
+                              marginLeft: '10px',
+                            }}
+                          >
+                            {issue.severity}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                          <span className="font-space uppercase" style={{ fontSize: '9px', letterSpacing: '0.15em', color: 'hsl(215 14% 44%)' }}>
+                            STATUS: <span style={{ color: 'hsl(210 20% 75%)' }}>{issue.status}</span>
+                          </span>
+                          {canAssignIssues && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <select
+                                style={{
+                                  background: 'hsl(220 42% 7%)',
+                                  border: '1px solid hsl(218 28% 22%)',
+                                  color: 'hsl(210 15% 75%)',
+                                  padding: '6px 10px',
+                                  fontFamily: "'Space Grotesk', sans-serif",
+                                  fontSize: '10px',
+                                  letterSpacing: '0.08em',
+                                  textTransform: 'uppercase',
+                                  outline: 'none',
+                                }}
+                                value={assignmentByIssue[issue.id] || ""}
+                                onChange={(event) => setAssignmentByIssue((prev) => ({ ...prev, [issue.id]: event.target.value }))}
+                              >
+                                <option value="">Assign Engineer</option>
+                                {engineerOptions.map((engineer) => (
+                                  <option key={engineer.id} value={String(engineer.id)}>
+                                    [{engineer.employeeId}] {engineer.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => assignIssue(issue.id, issue.aircraftId, issue.status)}
+                                disabled={assigningIssueId === issue.id}
+                                style={{
+                                  padding: '6px 14px',
+                                  border: '1px solid hsl(188 100% 48% / 0.4)',
+                                  background: 'hsl(188 100% 48% / 0.07)',
+                                  color: 'hsl(188 100% 70%)',
+                                  fontFamily: "'Space Grotesk', sans-serif",
+                                  fontSize: '10px',
+                                  fontWeight: 600,
+                                  letterSpacing: '0.15em',
+                                  textTransform: 'uppercase',
+                                  cursor: assigningIssueId === issue.id ? 'not-allowed' : 'pointer',
+                                  opacity: assigningIssueId === issue.id ? 0.6 : 1,
+                                  transition: 'all 0.15s ease',
+                                }}
+                              >
+                                {assigningIssueId === issue.id ? 'WAIT...' : (isAssigned ? 'REASSIGN' : 'ASSIGN')}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            </Panel>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid hsl(142 68% 42% / 0.2)', background: 'hsl(142 68% 42% / 0.05)', padding: '14px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'hsl(142 68% 48%)', flexShrink: 0 }} />
+                  <p className="font-space uppercase" style={{ fontSize: '10px', letterSpacing: '0.15em', color: 'hsl(142 68% 55%)' }}>
+                    All systems nominal. No active diagnostic issues.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Maintenance Logs */}
+          <div style={{ border: '1px solid hsl(218 28% 18%)', background: 'hsl(220 40% 8% / 0.7)' }}>
+            <div style={{ padding: '10px 16px', borderBottom: '1px solid hsl(218 28% 15%)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="font-space uppercase tracking-widest" style={{ fontSize: '9px', color: 'hsl(215 14% 45%)' }}>MAINTENANCE LOGS</span>
+              {maintenanceEntries.length > 0 && (
+                <span className="font-space" style={{ fontSize: '9px', color: 'hsl(215 14% 42%)', letterSpacing: '0.12em' }}>
+                  {maintenanceEntries.length} items
+                </span>
+              )}
+            </div>
+            <div style={{ padding: '0' }}>
+              {maintenanceEntries.length === 0 ? (
+                <p
+                  className="font-space uppercase"
+                  style={{ fontSize: '10px', letterSpacing: '0.2em', color: 'hsl(215 14% 38%)', padding: '20px 16px', textAlign: 'center', borderBottom: '1px dashed hsl(218 28% 16%)' }}
+                >
+                  No maintenance history.
+                </p>
+              ) : (
+                maintenanceEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    style={{
+                      padding: '12px 16px',
+                      borderBottom: '1px solid hsl(218 28% 14%)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'hsl(220 40% 10% / 0.5)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <div>
+                      <p
+                        className="font-space uppercase tracking-widest"
+                        style={{ fontSize: '11px', fontWeight: 600, color: 'hsl(210 20% 85%)', marginBottom: '2px' }}
+                      >
+                        {entry.logType.replace(/_/g, " ")}
+                      </p>
+                      <p className="font-inter" style={{ fontSize: '11px', color: 'hsl(215 14% 48%)' }}>
+                        {entry.summary || "Standard maintenance procedure"}
+                      </p>
+                    </div>
+                    <span
+                      className="font-space"
+                      style={{ fontSize: '10px', letterSpacing: '0.1em', color: 'hsl(215 14% 38%)', flexShrink: 0, marginLeft: '12px' }}
+                    >
+                      {new Date(entry.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Right column: System Schematic ── */}
+        <div style={{ border: '1px solid hsl(218 28% 18%)', background: 'hsl(220 40% 8% / 0.7)', position: 'sticky', top: '60px' }}>
+          <div style={{ padding: '10px 16px', borderBottom: '1px solid hsl(218 28% 15%)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="font-space uppercase tracking-widest" style={{ fontSize: '9px', color: 'hsl(215 14% 45%)' }}>SYSTEM SCHEMATIC</span>
+            <span
+              className="font-space uppercase tracking-widest"
+              style={{ fontSize: '8px', color: 'hsl(142 68% 55%)', border: '1px solid hsl(142 68% 42% / 0.3)', background: 'hsl(142 68% 42% / 0.06)', padding: '2px 8px' }}
+            >
+              LIVE
+            </span>
+          </div>
+
+          {/* Blueprint */}
+          <div
+            style={{
+              position: 'relative',
+              background: 'hsl(220 42% 5% / 0.8)',
+              aspectRatio: '1/1',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden',
+              borderBottom: '1px solid hsl(218 28% 15%)',
+            }}
+          >
+            {/* Grid overlay */}
+            <div
+              style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.25,
+                backgroundImage: 'linear-gradient(hsl(218 28% 20% / 0.4) 1px, transparent 1px), linear-gradient(90deg, hsl(218 28% 20% / 0.4) 1px, transparent 1px)',
+                backgroundSize: '24px 24px',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none',
+                background: 'radial-gradient(circle at center, transparent 20%, hsl(220 45% 5% / 0.85) 100%)',
+              }}
+            />
+
+            <img
+              src="/aircraft.svg"
+              alt="Aircraft schematic"
+              style={{ width: '90%', height: '90%', objectFit: 'contain', opacity: 0.7, mixBlendMode: 'screen', position: 'relative', zIndex: 1 }}
+              loading="lazy"
+              onError={handleBlueprintImageError}
+            />
+
+            {/* Component markers */}
+            {COMPONENT_KEYS.map((component) => {
+              const position = COMPONENT_MARKER_POSITIONS[component];
+              const state = componentHealth[component];
+              const hasIssue = openIssuesByComponent[component] > 0;
+              const isSelected = selectedPart === component;
+              const color = stateColor(state);
+
+              return (
+                <div key={component} style={{ position: 'absolute', top: position.top, left: position.left, zIndex: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPart(component)}
+                    style={{
+                      width: '36px', height: '36px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transform: 'translate(-50%,-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      position: 'relative',
+                    }}
+                    title={`${COMPONENT_LABELS[component]}: ${state}`}
+                  >
+                    {isSelected && (
+                      <div style={{
+                        position: 'absolute', inset: 0, borderRadius: '50%',
+                        border: `2px solid ${color.dot}`,
+                        animation: 'ping 1.2s ease-out infinite',
+                        opacity: 0.4,
+                      }} />
+                    )}
+                    <div
+                      style={{
+                        width: '12px', height: '12px',
+                        borderRadius: '50%',
+                        background: color.dot,
+                        boxShadow: hasIssue || isSelected ? `0 0 10px ${color.glow}` : `0 0 4px ${color.glow}`,
+                        border: `1px solid hsl(0 0% 100% / 0.15)`,
+                        transition: 'all 0.2s ease',
+                        transform: isSelected ? 'scale(1.3)' : 'scale(1)',
+                        animation: hasIssue ? 'damage-pulse 1.5s ease-in-out infinite' : 'none',
+                      }}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Selected component info */}
+          <div style={{ padding: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span className="font-space uppercase" style={{ fontSize: '8px', letterSpacing: '0.2em', color: 'hsl(215 14% 42%)' }}>SELECTED SYSTEM</span>
+              <span
+                className="font-space uppercase tracking-widest"
+                style={{
+                  fontSize: '9px',
+                  border: `1px solid ${selectedColor.dot}40`,
+                  background: `${selectedColor.dot}14`,
+                  color: selectedColor.dot,
+                  padding: '2px 10px',
+                }}
+              >
+                {componentHealth[selectedPart]}
+              </span>
+            </div>
+
+            <h4
+              className="font-orbitron font-bold uppercase"
+              style={{ fontSize: '18px', letterSpacing: '0.1em', color: 'hsl(210 20% 92%)', marginBottom: '8px' }}
+            >
+              {COMPONENT_LABELS[selectedPart]}
+            </h4>
+
+            <p
+              className="font-inter"
+              style={{ fontSize: '11px', color: 'hsl(215 14% 50%)', lineHeight: 1.55, marginBottom: '16px', borderLeft: '2px solid hsl(218 28% 22%)', paddingLeft: '10px' }}
+            >
+              {componentHealth[selectedPart] === 'Good'
+                ? `${COMPONENT_LABELS[selectedPart]} telemetry is green. Systems operating within parameters.`
+                : `Diagnostic alert in ${COMPONENT_LABELS[selectedPart]}. Review active issues.`}
+            </p>
+
+            {/* Component buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+              {COMPONENT_KEYS.map((component) => {
+                const color = stateColor(componentHealth[component]);
+                return (
+                  <button
+                    key={component}
+                    type="button"
+                    onClick={() => setSelectedPart(component)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '7px',
+                      padding: '7px 10px',
+                      border: selectedPart === component ? `1px solid hsl(188 100% 48% / 0.4)` : '1px solid hsl(218 28% 18%)',
+                      background: selectedPart === component ? 'hsl(188 100% 48% / 0.07)' : 'transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedPart !== component) (e.currentTarget as HTMLButtonElement).style.borderColor = 'hsl(218 28% 26%)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedPart !== component) (e.currentTarget as HTMLButtonElement).style.borderColor = 'hsl(218 28% 18%)';
+                    }}
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: color.dot, flexShrink: 0 }} />
+                    <span className="font-space" style={{ fontSize: '9px', letterSpacing: '0.1em', color: selectedPart === component ? 'hsl(188 100% 70%)' : 'hsl(215 14% 55%)', textTransform: 'uppercase' }}>
+                      {COMPONENT_LABELS[component]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

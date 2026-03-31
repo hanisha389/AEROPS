@@ -3,20 +3,25 @@ import { cn } from "@/lib/utils"
 
 export interface PanelProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
+  label?: string;
 }
 
 const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
-  ({ className, children, ...props }, ref) => {
+  ({ className, children, label, ...props }, ref) => {
     return (
       <div
         ref={ref}
         className={cn(
-          "bg-[#111827]/85 border border-white/10 rounded-xl shadow-lg backdrop-blur-sm",
-          "transition-all duration-200",
+          "mil-panel",
           className
         )}
         {...props}
       >
+        {label && (
+          <div className="mil-panel-header">
+            <span className="mil-panel-label">{label}</span>
+          </div>
+        )}
         {children}
       </div>
     )
