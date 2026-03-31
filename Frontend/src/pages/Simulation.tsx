@@ -441,7 +441,7 @@ const Simulation = () => {
         return prev;
       }
 
-       const aircraftModel = aircraftCatalog[aircraftId]?.model || aircraftCatalog[aircraftId]?.name;
+      const aircraftModel = aircraftCatalog[aircraftId]?.model || aircraftCatalog[aircraftId]?.name;
       const profile = resolveAircraftProfile(aircraftModel);
       const payloadWeightKg = computePayloadWeightKg(aircraftMap);
       if (payloadWeightKg > profile.ordnanceLimit) {

@@ -13,7 +13,9 @@ const statusStyles: Record<"active" | "injured" | "offline", string> = {
 
 const normalizeStatus = (value: string): "active" | "injured" | "offline" => {
   const status = value.toLowerCase();
-  if (status.includes("injur")) return "injured";
+  if (status.includes("injur") || status.includes("medical") || status.includes("hold") || status.includes("critical") || status.includes("damage")) {
+    return "injured";
+  }
   if (status.includes("offline") || status.includes("leave") || status.includes("holiday")) return "offline";
   return "active";
 };
@@ -43,9 +45,8 @@ const StatusBadge = ({ status, align = "left", compact = false, variant = "badge
   return (
     <div className={`flex ${wrapperClass}`}>
       <span
-        className={`inline-flex items-center gap-1 border px-2 py-1 font-orbitron tracking-[0.08em] ${
-          compact ? "text-[10px]" : "text-xs"
-        } ${statusStyles[normalized]}`}
+        className={`inline-flex items-center gap-1 border px-2 py-1 font-orbitron tracking-[0.08em] ${compact ? "text-[10px]" : "text-xs"
+          } ${statusStyles[normalized]}`}
       >
         <span className="h-1.5 w-1.5 rounded-full bg-current" />
         {status.toUpperCase()}

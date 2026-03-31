@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import BackgroundLayout from "@/components/BackgroundLayout";
 import PageHeader from "@/components/PageHeader";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import DocumentPdfTemplate from "@/components/documents/DocumentPdfTemplate";
 import { api, type GeneratedDocument } from "@/lib/api";
 import { Panel } from "@/components/ui/custom/Panel";
 
@@ -10,6 +12,9 @@ const Documents = () => {
   const [pilotFilter, setPilotFilter] = useState("");
   const [aircraftFilter, setAircraftFilter] = useState("");
   const [selectedDoc, setSelectedDoc] = useState<GeneratedDocument | null>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const pdfRef = useRef<HTMLDivElement | null>(null);
 
   const load = () => {
     api.listDocuments({
@@ -28,113 +33,36 @@ const Documents = () => {
     [documents],
   );
 
-  if (selectedDoc) {
-    const fields = selectedDoc.payload.fields;
-    const relatedEntity = selectedDoc.pilotId ? `Pilot #${selectedDoc.pilotId}` : selectedDoc.aircraftId ? `Aircraft ${selectedDoc.aircraftId}` : "General";    
-    const isMedical = selectedDoc.documentType === "PILOT_MEDICAL_REPORT";      
+  const handleDownloadPdf = async () => {
+    if (!selectedDoc || !pdfRef.current) {
+      return;
+    }
 
-    return (
-      <BackgroundLayout>
-        <PageHeader title="DOCUMENTATION READER" backTo="/documents" />
-        <div className="p-6 max-w-4xl mx-auto">
-          <div className="mb-4 flex justify-end">
-            <button onClick={() => setSelectedDoc(null)} className="rounded bg-white/5 border border-white/10 hover:bg-white/10 px-4 py-2 font-inter font-medium text-xs tracking-widest uppercase text-gray-300 transition-colors">
-              CLOSE DOCUMENT
-            </button>
-          </div>
+    setGeneratingPdf(true);
+    setPdfError(null);
+    const html2pdf = (await import("html2pdf.js")).default;
+    const options = {
+      margin: [10, 10, 10, 10],
+      filename: `AEROPS-DOC-${selectedDoc.id}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      pagebreak: { mode: ["css", "legacy"] },
+    };
 
-          <Panel className="p-8">
-            <header className="border-b border-white/10 pb-6 mb-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="font-rajdhani text-3xl font-bold text-gray-100 uppercase tracking-widest">{selectedDoc.title}</h2>
-                  <p className="font-inter text-sm text-gray-400 mt-2">Document ID: {selectedDoc.id}</p>
-                </div>
-                <div className="text-right">
-                  <span className="inline-block px-2 py-1 text-[10px] font-bold tracking-widest uppercase rounded bg-accent/20 text-accent border border-accent/30 mb-2">
-                    {selectedDoc.documentType}
-                  </span>
-                  <p className="font-inter text-sm text-gray-400">{new Date(selectedDoc.createdAt).toLocaleString()}</p>
-                </div>
-              </div>
-            </header>
-
-            {isMedical ? (
-              <section className="grid grid-cols-1 gap-6 md:grid-cols-[16rem_1fr]">
-                <div className="overflow-hidden rounded border border-white/10 bg-black/40 aspect-square flex items-center justify-center">
-                  {String(fields.pilotImage || "").trim() ? (
-                    <img src={String(fields.pilotImage)} alt={String(fields.pilotName || "Pilot")} className="h-full w-full object-cover grayscale opacity-80" />
-                  ) : (
-                    <div className="text-xs font-inter text-gray-600 uppercase tracking-widest">Image Unavailable</div>
-                  )}
-                </div>
-                <div className="flex flex-col gap-4 bg-black/20 p-5 rounded border border-white/5">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Subject Name</span>
-                      <span className="font-inter text-sm font-medium text-gray-200">{String(fields.pilotName || "N/A")}</span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Current Status</span>
-                      <span className="font-inter text-sm font-medium text-gray-200">{String(fields.status || "N/A")}</span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Fit For Duty</span>
-                      <span className="font-inter text-sm font-bold text-gray-200">
-                        {String(fields.fitForDuty || "N/A")}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">Fatigue Level</span>
-                      <span className="font-inter text-sm font-medium text-gray-200">{String(fields.fatigueLevel || "N/A")}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="border-t border-white/5 pt-4 mt-2">
-                    <span className="block text-[10px] uppercase tracking-widest text-gray-500 mb-2">Reported Injuries</span>
-                    <p className="font-inter text-sm text-gray-300">{String(fields.injuries || "None")}</p>
-                  </div>
-                  
-                  <div className="border-t border-white/5 pt-4">
-                    <span className="block text-[10px] uppercase tracking-widest text-gray-500 mb-2">Medical Officer Remarks</span>
-                    <p className="font-inter text-sm text-gray-300 italic">"{String(fields.remarks || "No remarks provided.")}"</p>
-                  </div>
-                </div>
-              </section>
-            ) : (
-              <section className="space-y-6">
-                {selectedDoc.payload.fixedSections && selectedDoc.payload.fixedSections.length > 0 && (
-                  <div className="space-y-3">
-                    {selectedDoc.payload.fixedSections.map((section) => (
-                      <div key={section} className="border-l-2 border-accent/50 bg-accent/5 p-4 rounded-r">
-                        <h3 className="font-rajdhani text-sm font-semibold tracking-widest text-gray-200 uppercase">{section}</h3>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="bg-black/20 p-5 rounded border border-white/5">  
-                  <h3 className="mb-4 font-rajdhani text-xs font-bold tracking-[0.14em] text-gray-500 uppercase border-b border-white/5 pb-2">Structured Content</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                    {Object.entries(fields).map(([key, value]) => (
-                      <div key={key}>
-                        <span className="block text-[10px] text-gray-500 uppercase tracking-widest mb-1">{key}</span>
-                        <span className="font-inter text-sm text-gray-200">{String(value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            )}
-          </Panel>
-        </div>
-      </BackgroundLayout>
-    );
-  }
+    try {
+      await html2pdf().set(options).from(pdfRef.current).save();
+    } catch (error) {
+      setPdfError("PDF download failed. Please retry.");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
   return (
     <BackgroundLayout>
       <PageHeader title="DATABASE ARCHIVE" />
-      <div className="space-y-6 p-6 max-w-7xl mx-auto">
+      <div className="space-y-6 p-6 w-full">
         <Panel className="p-4 bg-gray-900/90">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4 items-end">
             <div className="flex flex-col">
@@ -195,6 +123,45 @@ const Documents = () => {
           )}
         </Panel>
       </div>
+
+      <Dialog open={Boolean(selectedDoc)} onOpenChange={(open) => !open && setSelectedDoc(null)}>
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-orbitron text-sm tracking-[0.2em] text-primary">
+              DOCUMENT PDF VIEWER
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-4">
+            <span className="font-rajdhani text-xs text-muted-foreground">Rendered from active document payload.</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={!selectedDoc || generatingPdf}
+                className="border border-primary px-4 py-2 font-orbitron text-xs text-primary disabled:opacity-50"
+              >
+                DOWNLOAD PDF
+              </button>
+            </div>
+          </div>
+
+          {pdfError && (
+            <div className="border border-danger/30 bg-danger/10 p-4 text-center text-xs text-danger">
+              {pdfError}
+            </div>
+          )}
+
+          {selectedDoc && (
+            <DocumentPdfTemplate document={selectedDoc} mode="screen" />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {selectedDoc && (
+        <div className="fixed left-[-10000px] top-0 pointer-events-none -z-50">
+          <DocumentPdfTemplate ref={pdfRef} document={selectedDoc} mode="print" className="w-[794px]" />
+        </div>
+      )}
     </BackgroundLayout>
   );
 };

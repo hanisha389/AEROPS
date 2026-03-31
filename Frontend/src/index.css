@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -11,7 +11,7 @@
     --foreground: 220 14% 96%;
 
     /* Professional clean panel styles */
-    --card: 221 39% 13%; 
+    --card: 221 39% 13%;
     --card-foreground: 220 14% 96%;
 
     --popover: 221 39% 13%;
@@ -20,7 +20,7 @@
     /* Sparing Primary usage */
     --primary: 186 100% 50%;
     --primary-foreground: 221 39% 11%;
-    
+
     --secondary: 215 28% 17%;
     --secondary-foreground: 186 100% 50%;
 
@@ -63,8 +63,30 @@
     font-family: 'Inter', sans-serif;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Rajdhani', sans-serif;
+  }
+
+  button,
+  a,
+  [role='button'] {
+    --magic-glow: 0, 212, 255;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+  }
+
+  button:not(.no-button-glow):hover,
+  button:not(.no-button-glow):focus-visible,
+  a:hover,
+  a:focus-visible,
+  [role='button']:not(.no-button-glow):hover,
+  [role='button']:not(.no-button-glow):focus-visible {
+    box-shadow: 0 0 0 1px rgba(var(--magic-glow), 0.25), 0 6px 18px rgba(var(--magic-glow), 0.18);
+    border-color: rgba(var(--magic-glow), 0.45);
   }
 }
 
@@ -72,11 +94,190 @@
   .font-orbitron {
     font-family: 'Orbitron', sans-serif;
   }
+
   .font-rajdhani {
     font-family: 'Rajdhani', sans-serif;
   }
+
   .font-inter {
     font-family: 'Inter', sans-serif;
+  }
+
+  .magic-hover {
+    position: relative;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+  }
+
+  .magic-hover--glow {
+    --magic-glow: 0, 212, 255;
+    --magic-glow-radius: 260px;
+  }
+
+  .magic-hover--glow:hover,
+  .magic-hover--glow:focus-visible {
+    box-shadow:
+      0 0 0 1px rgba(var(--magic-glow), 0.55),
+      0 0 24px rgba(var(--magic-glow), 0.35),
+      0 12px 32px rgba(var(--magic-glow), 0.25);
+    border-color: rgba(var(--magic-glow), 0.75);
+  }
+
+  .magic-hover--disabled:hover,
+  .magic-hover--disabled:focus-visible {
+    box-shadow: none;
+  }
+
+  .magic-hover--disabled .magic-hover--glow:hover,
+  .magic-hover--disabled .magic-hover--glow:focus-visible {
+    box-shadow: none;
+    border-color: inherit;
+  }
+
+  .tactical-noise,
+  .tactical-ambient,
+  .tactical-grid,
+  .tactical-scan,
+  .tactical-nodes,
+  .tactical-ping {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .tactical-noise {
+    opacity: 0.04;
+    background-image:
+      radial-gradient(circle at 25% 30%, rgba(255, 255, 255, 0.08) 0 0.7px, transparent 0.8px),
+      radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.06) 0 0.7px, transparent 0.8px);
+    background-size: 2px 2px, 3px 3px;
+  }
+
+  .tactical-ambient {
+    opacity: 0.18;
+    background-image:
+      radial-gradient(65rem 34rem at 50% 35%, rgba(0, 183, 255, 0.09), transparent 62%),
+      radial-gradient(42rem 24rem at 78% 72%, rgba(0, 120, 255, 0.06), transparent 70%);
+  }
+
+  .tactical-grid {
+    opacity: 0.12;
+    background-image:
+      linear-gradient(rgba(90, 125, 168, 0.14) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(90, 125, 168, 0.14) 1px, transparent 1px);
+    background-size: 64px 52px, 64px 52px;
+    animation: tactical-grid-drift 70s linear infinite;
+  }
+
+  .tactical-scan {
+    opacity: 0.24;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(0, 212, 255, 0.02) 42%,
+      rgba(0, 212, 255, 0.2) 50%,
+      rgba(0, 212, 255, 0.04) 58%,
+      transparent 100%
+    );
+    transform: translateY(-120%);
+    animation: tactical-scan-down 16s linear infinite;
+  }
+
+  .tactical-scan--reverse {
+    opacity: 0.12;
+    animation: tactical-scan-up 24s linear infinite;
+    animation-delay: 6s;
+  }
+
+  .tactical-nodes {
+    opacity: 0.38;
+    background-image:
+      radial-gradient(circle at 14% 20%, rgba(0, 212, 255, 0.66) 0 1.1px, transparent 2px),
+      radial-gradient(circle at 28% 66%, rgba(0, 212, 255, 0.62) 0 1.1px, transparent 2px),
+      radial-gradient(circle at 47% 38%, rgba(0, 212, 255, 0.6) 0 1.1px, transparent 2px),
+      radial-gradient(circle at 61% 72%, rgba(0, 212, 255, 0.55) 0 1.1px, transparent 2px),
+      radial-gradient(circle at 74% 28%, rgba(0, 212, 255, 0.58) 0 1.1px, transparent 2px),
+      radial-gradient(circle at 86% 58%, rgba(0, 212, 255, 0.5) 0 1px, transparent 2px);
+    animation: tactical-node-pulse 9s ease-in-out infinite;
+  }
+
+  .tactical-ping {
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 212, 255, 0.5);
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    animation: tactical-ping-wave 10s ease-out infinite;
+    opacity: 0;
+  }
+
+  .tactical-ping--one {
+    left: 21%;
+    top: 61%;
+    animation-delay: 1.2s;
+  }
+
+  .tactical-ping--two {
+    left: 69%;
+    top: 33%;
+    animation-delay: 4.8s;
+  }
+}
+
+@keyframes tactical-grid-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-12px, -9px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes tactical-scan-down {
+  0% {
+    transform: translateY(-120%);
+  }
+  100% {
+    transform: translateY(120%);
+  }
+}
+
+@keyframes tactical-scan-up {
+  0% {
+    transform: translateY(120%);
+  }
+  100% {
+    transform: translateY(-120%);
+  }
+}
+
+@keyframes tactical-node-pulse {
+  0%,
+  100% {
+    opacity: 0.24;
+  }
+  50% {
+    opacity: 0.42;
+  }
+}
+
+@keyframes tactical-ping-wave {
+  0% {
+    transform: scale(0.45);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.55;
+  }
+  65% {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(3.2);
+    opacity: 0;
   }
 }
 
@@ -84,13 +285,16 @@
 ::-webkit-scrollbar {
   width: 4px;
 }
+
 ::-webkit-scrollbar-track {
   background: hsl(221 39% 11%);
 }
+
 ::-webkit-scrollbar-thumb {
   background: hsl(215 16% 47% / 0.5);
   border-radius: 2px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(215 16% 47% / 0.8);
 }

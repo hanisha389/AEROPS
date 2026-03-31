@@ -11,7 +11,7 @@ const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
       <div
         ref={ref}
         className={cn(
-          "bg-[#111827]/85 border border-white/10 rounded-xl shadow-lg backdrop-blur-sm",
+          "bg-[#111827]/85 border border-white/10 rounded-xl shadow-lg backdrop-blur-sm magic-hover magic-hover--glow",
           "transition-all duration-200",
           className
         )}

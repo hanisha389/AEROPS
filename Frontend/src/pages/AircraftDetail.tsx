@@ -5,6 +5,7 @@ import PageHeader from "@/components/PageHeader";
 import { api, type AircraftMaintenanceHistoryItem } from "@/lib/api";
 import { getCurrentRole } from "@/lib/rbac";
 import { Panel } from "@/components/ui/custom/Panel";
+import AnimatedList from "./AnimatedList";
 
 type ComponentState = "Good" | "Warning" | "Critical";
 type ComponentKey = "engine" | "wings" | "avionics" | "fuel" | "landingGear";
@@ -124,12 +125,12 @@ const componentStateClass = (value: ComponentState): string => {
 
 const componentMarkerClass = (value: ComponentState): string => {
   if (value === "Critical") {
-    return "border-danger bg-danger/80 animate-pulse";
+    return "border-red-500/90 bg-red-500/25 text-red-400 animate-pulse";
   }
   if (value === "Warning") {
-    return "border-yellow-400 bg-yellow-400/80 animate-pulse";
+    return "border-amber-400/90 bg-amber-400/25 text-amber-300 animate-pulse";
   }
-  return "border-success bg-success/60";
+  return "border-green-500/85 bg-green-500/20 text-green-400";
 };
 
 const normalizeComponentName = (value: string): string => value.toLowerCase().replace(/[\s_-]+/g, "");
@@ -215,6 +216,15 @@ const AircraftDetail = () => {
     return aircraft.openIssues.length > 0 ? "NOT READY" : "READY";
   }, [aircraft]);
 
+  const maintenanceItems = useMemo(() => {
+    return maintenanceEntries.map((entry) => {
+      const logType = entry.logType.replace(/_/g, " ");
+      const summary = entry.summary || "Standard maintenance procedure";
+      const dateLabel = new Date(entry.createdAt).toLocaleDateString();
+      return `${logType} — ${summary} | ${dateLabel}`;
+    });
+  }, [maintenanceEntries]);
+
   const statusClass = useMemo(() => {
     return componentStateClass(componentHealth[selectedPart]);
   }, [componentHealth, selectedPart]);
@@ -280,7 +290,7 @@ const AircraftDetail = () => {
   return (
     <BackgroundLayout>
       <PageHeader title="AIRCRAFT DIAGNOSTICS" backTo="/aircraft" />
-      <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-6 p-6 w-full">
         <header className="mb-2">
           <h1 className="text-3xl font-rajdhani font-bold text-gray-200 uppercase tracking-wider">
             {aircraft.name}
@@ -395,35 +405,33 @@ const AircraftDetail = () => {
               {maintenanceEntries.length === 0 ? (
                 <p className="text-sm font-inter text-gray-400">No previous maintenance history logged.</p>
               ) : (
-                <div className="space-y-3">
-                  {maintenanceEntries.map((entry) => (
-                    <div key={entry.id} className="bg-white/[0.02] border border-white/5 p-3 rounded-lg flex justify-between items-center group hover:bg-white/[0.04] transition-colors">
-                      <div className="flex flex-col">
-                        <span className="font-rajdhani font-medium text-gray-200 text-sm">{entry.logType.replace(/_/g, " ")}</span>
-                        <span className="font-inter text-gray-400 text-xs mt-1">{entry.summary || "Standard maintenance procedure"}</span>
-                      </div>
-                      <span className="text-xs text-gray-500 font-inter tabular-nums">{new Date(entry.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  ))}
-                </div>
+                <AnimatedList
+                  items={maintenanceItems}
+                  showGradients
+                  enableArrowNavigation
+                  displayScrollbar
+                  className="w-full max-w-none"
+                  listClassName="max-h-[280px]"
+                  itemClassName="!bg-white/[0.02] border border-white/5 text-gray-200 hover:!bg-white/[0.04] text-left"
+                />
               )}
             </Panel>
 
           </div>
 
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 flex">
             {/* Blueprint Overview Panel */}
-            <Panel className="p-6 sticky top-6">
+            <Panel className="flex h-full w-full flex-col p-6">
               <h3 className="text-lg font-rajdhani font-medium text-gray-300 border-b border-white/5 pb-2 mb-4 uppercase flex justify-between items-center">
                 System Schematic
                 <span className="text-[10px] text-accent tracking-widest px-2 py-1 bg-accent/10 rounded">LIVE</span>
               </h3>
 
-              <div className="relative bg-black/40 rounded-lg p-2 border border-white/5 mb-6 aspect-square max-h-80 mx-auto flex items-center justify-center">
+              <div className="relative mb-6 flex min-h-[28rem] flex-1 items-center justify-center rounded-lg border border-white/5 bg-black/40 p-3">
                 <img
                   src="/aircraft.svg"
                   alt="Aircraft diagram"
-                  className="w-full h-full object-contain opacity-80"
+                  className="h-full w-full object-contain opacity-85"
                   loading="lazy"
                   onError={handleBlueprintImageError}
                 />
@@ -451,7 +459,7 @@ const AircraftDetail = () => {
               <div className="bg-black/20 rounded-lg p-4 border border-white/5">
                 <div className="flex justify-between items-center mb-4">
                   <span className="font-inter text-xs text-gray-400 uppercase tracking-widest">Selected System</span>
-                  <span className={`text-xs px-2 py-1 rounded font-bold`}>
+                  <span className={`text-xs px-2 py-1 rounded font-bold ${statusClass}`}>
                     {componentHealth[selectedPart].toUpperCase()}
                   </span>
                 </div>

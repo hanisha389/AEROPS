@@ -56,11 +56,10 @@ const MainMenu = () => {
               return (
                 <motion.button
                   key={item.path}
-                  className={`group flex items-center gap-4 border-l-2 px-4 py-3 text-left font-rajdhani text-lg font-medium tracking-wider transition-all duration-200 ${
-                    hovered === i
+                  className={`group flex items-center gap-4 border-l-2 px-4 py-3 text-left font-rajdhani text-lg font-medium tracking-wider transition-all duration-200 ${hovered === i
                       ? 'border-primary bg-primary/5 text-primary neon-glow'
                       : 'border-transparent text-muted-foreground hover:border-primary/50 hover:text-primary/80'
-                  }`}
+                    }`}
                   onMouseEnter={() => setHovered(i)}
                   onMouseLeave={() => setHovered(null)}
                   onClick={() => navigate(item.path)}
